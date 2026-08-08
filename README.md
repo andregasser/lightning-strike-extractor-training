@@ -14,6 +14,21 @@ uv sync --extra train --extra dev
 
 The product CLI does not need to be installed in this environment.
 
+## Importing CLI frame handoffs
+
+The video-analysis repository exports neutral frames and provenance only. Import
+that directory here to create an annotation campaign:
+
+```bash
+uv run lightning-model import-handoff ../frame-export \
+  --output campaigns/storm-2026-08
+```
+
+The importer validates schema, safe paths, image decoding, duplicate hashes and
+SHA-256 checksums. It publishes annotator tasks, a label configuration, served
+images and a campaign manifest atomically. Annotation and conversion into the
+model lab's internal dataset format happen entirely in this repository.
+
 ## Pipeline
 
 ```bash

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .evaluation import evaluate
+from .handoff import import_handoff
 from .onnx_release import export_onnx_release
 from .release import build_release
 from .training import train
@@ -17,6 +18,10 @@ def main(argv: list[str] | None = None) -> int:
     release.add_argument("campaigns", nargs="+", type=Path)
     release.add_argument("--output", required=True, type=Path)
     release.add_argument("--release-id", required=True)
+    handoff = commands.add_parser("import-handoff", help="Import a CLI frame handoff for annotation")
+    handoff.add_argument("handoff", type=Path)
+    handoff.add_argument("--output", required=True, type=Path)
+    handoff.add_argument("--image-base-url", default="http://localhost:8001/images")
     training = commands.add_parser("train", help="Train the closed-set detector")
     training.add_argument("release", type=Path)
     training.add_argument("--output", required=True, type=Path)
@@ -34,7 +39,13 @@ def main(argv: list[str] | None = None) -> int:
     export.add_argument("--output", required=True, type=Path)
     export.add_argument("--version", required=True)
     args = parser.parse_args(argv)
-    if args.command == "release":
+    if args.command == "import-handoff":
+        result = import_handoff(
+            args.handoff,
+            args.output,
+            image_base_url=args.image_base_url,
+        )
+    elif args.command == "release":
         result = build_release(args.campaigns, args.output, release_id=args.release_id)
     elif args.command == "train":
         result = train(args.release, args.output, epochs=args.epochs, seed=args.seed)
