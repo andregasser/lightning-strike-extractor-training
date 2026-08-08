@@ -8,7 +8,7 @@ COCO JSON; the video CLI is only one possible producer of suitable images.
 ## Environment
 
 ```bash
-cd model-development
+cd lightning-strike-model-lab
 uv sync --extra train --extra dev
 ```
 
