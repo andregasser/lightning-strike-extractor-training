@@ -33,6 +33,68 @@ uv run lse-train --help
 Keep raw videos outside Git. A video is read in place by the inference CLI and
 is never copied into either repository.
 
+## Best practices for video source storage
+
+Raw videos are the source of truth for future dataset growth. Store them in a
+dedicated external data volume or object store, not in Git, `data/` inside this
+repository, experiment folders or model releases. Both repositories should
+contain only code, manifests, documentation and small test fixtures.
+
+Use a stable, date- and source-oriented layout. For example:
+
+```text
+/data/lightning/
+├── sources/
+│   ├── 2026/
+│   │   └── 2026-08-09/
+│   │       ├── camera-a/
+│   │       │   ├── camera-a_2026-08-09T214500Z.mp4
+│   │       │   └── camera-a_2026-08-09T220000Z.mp4
+│   │       └── camera-b/
+│   │           └── camera-b_2026-08-09T214500Z.mp4
+│   └── source-catalog.json
+├── handoffs/
+├── verified-datasets/
+└── backups/
+```
+
+Follow these rules:
+
+1. **Keep source files immutable.** Never overwrite, trim, re-encode or rename
+   a video after it has been analyzed. If a corrected or transcoded copy is
+   needed, create a new source record and a new source ID.
+2. **Use stable source identity.** Record a source ID independent of the local
+   path, for example a hash or an assigned identifier such as
+   `camera-a-2026-08-09-214500z`. Preserve the original filename, capture time,
+   camera, location (when appropriate), duration, codec, resolution and FPS in
+   `source-catalog.json` or an equivalent external catalog.
+3. **Separate storage from generated data.** Keep raw videos under `sources/`,
+   exported handoffs under `handoffs/`, verified dataset inputs under
+   `verified-datasets/` and backups under `backups/`. Do not mix generated
+   frames back into the raw source directory.
+4. **Verify integrity before analysis.** Record a SHA-256 checksum and file
+   size when a video enters the catalog. Recheck the checksum after transfers
+   or restores. The analysis run stores the probed source metadata and source
+   identity, while the handoff stores checksums for exported frames.
+5. **Use local paths only as configuration.** The absolute path passed to
+   `lse` may differ between machines. The source ID and provenance in the run
+   and handoff must remain stable so that a dataset release can be reproduced
+   without relying on one workstation's directory layout.
+6. **Back up before annotation.** Keep at least one independent, read-only or
+   versioned backup of the raw videos and the source catalog. Dataset releases
+   and handoffs can be regenerated from the source videos, but only if the
+   original bytes remain available.
+
+Before analyzing a new source, verify that the file is present and readable:
+
+```bash
+uv run lse inspect /data/lightning/sources/2026/2026-08-09/camera-a/camera-a_2026-08-09T214500Z.mp4
+```
+
+The path above is intentionally local to the machine running `lse`; it is not
+committed to either repository. After analysis, keep the resulting run and
+handoff IDs in the external source catalog or project tracking system.
+
 ## 2. Start with raw videos and create candidate frames
 
 Run the inference repository against each source video. The workflow has two
@@ -86,10 +148,22 @@ different commands here:
 
   This creates a run below `runs/videos/<video-run-id>/`. Use `--output` only
   when you intentionally want to place the complete run tree elsewhere. Use
-  `analyze` when you want data that can later be exported into a handoff.
+  `analyze` when you want data that can later be exported into a handoff. The
+  time range is optional; using a short range is useful for a first smoke test.
 
-The time range is optional; using a short range is useful for a first smoke
-test.
+  For a batch of videos, pass a directory. Add `--recursive` when nested
+  directories should be searched:
+
+  ```bash
+  uv run lse analyze /data/storms/2026-08-09 \
+    --recursive
+  ```
+
+  The command creates one video run below `runs/videos/` per discovered video
+  and one orchestration run below `runs/batches/` for the complete batch.
+  Leave `--max-events` unset for complete processing; its default value `0`
+  means that no event limit is applied. Use a positive value only for a
+  deliberately bounded exploratory run.
 
 There is no direct data dependency between the commands: `analyze` performs
 its own media probing and does not consume an `inspect` JSON file. Therefore,
