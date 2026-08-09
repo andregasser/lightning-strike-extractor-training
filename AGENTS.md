@@ -6,6 +6,19 @@ This repository owns detector dataset preparation, annotation handoffs,
 immutable dataset releases, training, evaluation and ONNX model releases for
 the Lightning Strike Extractor. It is independent from the video-analysis CLI.
 
+## Repository split
+
+The project is maintained across two separate Git repositories:
+
+- [`lightning-strike-extractor-training`](https://github.com/andregasser/lightning-strike-extractor-training)
+  contains dataset preparation, training, evaluation and ONNX model releases.
+- [`lightning-strike-extractor`](https://github.com/andregasser/lightning-strike-extractor)
+  contains the production CLI and video-analysis runtime.
+
+The repositories are independent projects with separate dependencies and
+lockfiles. They communicate only through versioned file contracts and released
+ONNX bundles; this training repo must never import or install the CLI.
+
 ## Architecture
 
 - Production training code lives in `src/lightning_model_lab/`.
