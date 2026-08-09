@@ -6,6 +6,12 @@ This repository owns detector dataset preparation, annotation handoffs,
 immutable dataset releases, training, evaluation and ONNX model releases for
 the Lightning Strike Extractor. It is independent from the video-analysis CLI.
 
+## Language policy
+
+All repository documentation, source code, code comments, command-line help,
+and user-facing messages must be written in English. Keep examples and
+technical terminology consistent with this policy.
+
 ## Repository split
 
 The project is maintained across two separate Git repositories:

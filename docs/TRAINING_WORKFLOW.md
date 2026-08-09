@@ -48,7 +48,7 @@ different commands here:
   uv run lse inspect /data/storms/camera-a.mp4 > /data/metadata/camera-a.json
   ```
 
-  Beispiel der Ausgabe für ein einzelnes Video:
+  Example output for a single video:
 
   ```json
   {
@@ -85,6 +85,66 @@ There is no direct data dependency between the commands: `analyze` performs
 its own media probing and does not consume an `inspect` JSON file. Therefore,
 `inspect` is optional human guidance, while `analyze` is the independent
 processing step that creates the run used by the later handoff export.
+
+### How `analyze` ranks frames
+
+The ranking is a deterministic computer-vision pipeline, not a trained model.
+It reduces hours of video to a reviewable set of likely channel frames:
+
+1. **Flash detection:** `lse` compares frames with a rolling luminance baseline
+   and groups nearby brightness changes into events. Events receive an initial
+   rank based on the size and rise of the flash.
+2. **Temporal channel response:** for each event, the current grayscale frame
+   is compared with a preceding frame. A local ridge response is intersected
+   with the temporal difference, so a candidate must be both newly bright and
+   line-like. Camera motion is compensated when stabilization is enabled.
+3. **Channel geometry:** the response is thresholded, lightly closed,
+   skeletonized and split into connected components. The strongest component
+   contributes line count, channel length, channel strength, branch count,
+   thickness, luminance and a geometry score. Dense frame-wide edges and large
+   bright areas are penalized because they are typical of motion, clouds or
+   exposure flashes.
+4. **Frame quality:** the principal quality score rewards long, bright,
+   branched, thin channels. In simplified form it is proportional to:
+
+   ```text
+   channel_length * (channel_luminance / 10)^2
+   * (1 + 0.15 * min(branch_points, 10))
+   / max(channel_thickness, 1)
+   ```
+
+   The geometry score and quality score are related but distinct: geometry
+   measures response/component evidence, while quality emphasizes how clearly
+   the component resembles a visible channel.
+5. **Multi-frame support:** when enabled, nearby candidate masks are dilated
+   slightly and compared. Spatial overlap within the configured time window
+   adds a bounded support bonus. This favors a channel that develops over
+   adjacent frames without allowing temporal overlap to invent geometry where
+   none exists.
+6. **Event winner selection:** candidates are grouped by `event_id`. The
+   winner is selected by `(frame_quality, multiframe_support,
+   geometry_score)`, with multi-frame quality used for final event ordering.
+   Strict geometry, length, line-count, strength and thickness gates reject
+   implausible candidates before export.
+
+The resulting metrics are written to the analysis run, primarily:
+
+```text
+runs/videos/<run>/
+├── source.json
+├── run.json
+├── results/
+│   ├── candidates.json
+│   └── candidates.csv
+└── events/
+```
+
+`candidates.json` is the authoritative machine-readable ranking output. The
+later handoff exporter uses it to select one strong representative per event
+and adds neighboring context frames. Thresholds remain configurable because
+camera noise, exposure, frame rate and weather vary; changing them is an
+inference-pipeline experiment and should be recorded separately from model
+training.
 
 ```bash
 cd ../lightning-strike-extractor
