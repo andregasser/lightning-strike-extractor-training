@@ -267,7 +267,7 @@ portable directory with `manifest.json`, images, source IDs, frame numbers,
 timestamps, candidate metrics and SHA-256 checksums.
 
 ```bash
-uv run python -m lse.dataset_export runs \
+uv run lse dataset-export runs \
   --output /data/handoffs/lightning-2026-08-09-camera-a \
   --max-events-per-video 200 \
   --context-frames 2

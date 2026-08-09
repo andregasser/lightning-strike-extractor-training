@@ -61,7 +61,7 @@ The product CLI is not required and must not be installed in this environment.
 Create a neutral handoff in the video repository:
 
 ```bash
-uv run python -m lse.dataset_export runs \
+uv run lse dataset-export runs \
   --output /path/to/frame-export
 ```
 
