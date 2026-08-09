@@ -126,7 +126,7 @@ baseline. It is a reference point, not a final architecture decision.
 
 ```bash
 uv run lse-train train releases/lightning-2026.08.1 \
-  --output experiments/baseline --epochs 10 --seed 17
+  --output experiments/baseline --epochs 10 --seed 17 --patience 5
 
 uv run lse-train evaluate releases/lightning-2026.08.1 \
   experiments/baseline/checkpoint.pt --split validation \
@@ -134,7 +134,9 @@ uv run lse-train evaluate releases/lightning-2026.08.1 \
 ```
 
 Evaluation reports true positives, false positives, false negatives, precision
-and recall at a documented IoU and confidence threshold. Compare multiple
+and recall at a documented IoU and confidence threshold. Training evaluates
+validation loss after every epoch, stops after `--patience` non-improving
+epochs, and saves the best validation checkpoint. Compare multiple
 architectures on the same release before production promotion.
 
 ## Export and verify ONNX

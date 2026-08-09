@@ -27,6 +27,13 @@ def main(argv: list[str] | None = None) -> int:
     training.add_argument("--output", required=True, type=Path)
     training.add_argument("--epochs", type=int, default=10)
     training.add_argument("--seed", type=int, default=17)
+    training.add_argument("--patience", type=int, default=5)
+    training.add_argument("--min-delta", type=float, default=0.0)
+    training.add_argument(
+        "--no-augmentation",
+        action="store_true",
+        help="Disable training image augmentation for a strict baseline run",
+    )
     evaluation = commands.add_parser("evaluate", help="Evaluate one trained checkpoint")
     evaluation.add_argument("release", type=Path)
     evaluation.add_argument("checkpoint", type=Path)
@@ -48,7 +55,15 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "release":
         result = build_release(args.campaigns, args.output, release_id=args.release_id)
     elif args.command == "train":
-        result = train(args.release, args.output, epochs=args.epochs, seed=args.seed)
+        result = train(
+            args.release,
+            args.output,
+            epochs=args.epochs,
+            seed=args.seed,
+            patience=args.patience,
+            min_delta=args.min_delta,
+            augment=not args.no_augmentation,
+        )
     elif args.command == "evaluate":
         result = evaluate(args.release, args.checkpoint, args.output, split=args.split)
     else:

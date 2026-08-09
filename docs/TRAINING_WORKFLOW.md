@@ -415,7 +415,8 @@ uv run lse-train train \
   releases/datasets/lightning-2026.08.1 \
   --output experiments/2026-08-09-fasterrcnn-mobilenet \
   --epochs 10 \
-  --seed 17
+  --seed 17 \
+  --patience 5
 ```
 
 The command trains only on the `train` split and writes:
@@ -426,9 +427,35 @@ experiments/2026-08-09-fasterrcnn-mobilenet/
 └── training.json
 ```
 
-`training.json` records the dataset release, architecture, epoch count, seed
-and loss history. Treat the checkpoint and report as one experiment; do not
-rename or detach them from their dataset release.
+Training evaluates the validation split after every epoch. If validation loss
+does not improve by at least `--min-delta` for `--patience` consecutive epochs,
+training stops early. The saved `checkpoint.pt` is always the best validation
+checkpoint, not necessarily the final epoch. Set `--patience 0` only when you
+intentionally want to stop at the first non-improving epoch; use a larger value
+for noisy validation curves.
+
+`training.json` records the dataset release, architecture, requested and
+completed epochs, seed, training losses, validation losses and early-stopping
+metadata. Treat the checkpoint and report as one experiment; do not rename or
+detach them from their dataset release.
+
+Training augmentation is enabled by default. The current conservative pipeline
+randomly mirrors training images horizontally and applies small contrast and
+brightness changes. Bounding boxes are mirrored with the image; validation and
+test images are never augmented. Use `--no-augmentation` only for a strict
+non-augmented comparison run:
+
+```bash
+uv run lse-train train \
+  releases/datasets/lightning-2026.08.1 \
+  --output experiments/no-augmentation \
+  --epochs 10 \
+  --no-augmentation
+```
+
+Augmentation changes the experiment definition, so compare augmented and
+non-augmented runs using the same dataset release, seed, validation split and
+evaluation thresholds.
 
 ## 7. Evaluate before exporting
 
