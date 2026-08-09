@@ -4,7 +4,8 @@
 
 # Lightning Strike Extractor Training
 
-Independent dataset and detector development for the Lightning Strike Extractor.
+Independent dataset and detector development for the
+[Lightning Strike Extractor CLI](https://github.com/andregasser/lightning-strike-extractor).
 
 This repository owns the complete model lifecycle: importing neutral frame
 handoffs, preparing annotation campaigns, creating immutable dataset releases,
@@ -12,9 +13,15 @@ training and evaluating detector candidates, and exporting verified ONNX model
 bundles. It is deliberately independent from the video-analysis CLI and must
 never import or install `lightning_extractor`.
 
-The product repository consumes one thing from this project: a released ONNX
-bundle with a manifest and checksums. Training checkpoints and framework-specific
-details never enter the product distribution.
+The [product repository](https://github.com/andregasser/lightning-strike-extractor)
+consumes one thing from this project: a released ONNX bundle with a manifest and
+checksums. Training checkpoints and framework-specific details never enter the
+product distribution.
+
+Together, the repositories form a deliberately separated pipeline: the CLI
+analyzes videos and creates provenance-rich frame handoffs; this repository
+turns those handoffs into verified datasets, trained models, and versioned ONNX
+releases for the CLI.
 
 ## Boundary and data flow
 
