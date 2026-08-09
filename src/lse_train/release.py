@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .coco import CATEGORY, load_verified_coco
+from .composition import build_composition_report, render_composition_markdown
 
 SPLITS = ("train", "validation", "test")
 
@@ -22,8 +23,18 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _canonical_boxes(boxes: list[list[float]]) -> tuple[tuple[float, ...], ...]:
-    return tuple(sorted(tuple(round(float(value), 6) for value in box) for box in boxes))
+def _canonical_annotations(
+    annotations: list[dict[str, Any]],
+) -> tuple[tuple[tuple[float, ...], tuple[str, ...]], ...]:
+    return tuple(
+        sorted(
+            (
+                tuple(round(float(value), 6) for value in annotation["bbox"]),
+                tuple(sorted(annotation.get("attributes", {}).get("rare_cases", []))),
+            )
+            for annotation in annotations
+        )
+    )
 
 
 def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> dict[str, Any]:
@@ -55,9 +66,9 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
             annotations_path = campaign / "annotations" / f"instances_{split}.json"
             images_root = campaign / "images" / split
             document = load_verified_coco(annotations_path, images_root)
-            boxes_by_image: dict[int, list[list[float]]] = defaultdict(list)
+            annotations_by_image: dict[int, list[dict[str, Any]]] = defaultdict(list)
             for annotation in document["annotations"]:
-                boxes_by_image[annotation["image_id"]].append(annotation["bbox"])
+                annotations_by_image[annotation["image_id"]].append(annotation)
             for image in document["images"]:
                 source_id = image["source_id"]
                 previous_split = source_splits.setdefault(source_id, split)
@@ -65,12 +76,19 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
                     raise ValueError(f"Source {source_id} appears in both {previous_split} and {split}")
                 image_path = images_root / image["file_name"]
                 image_hash = sha256(image_path)
-                boxes = _canonical_boxes(boxes_by_image[image["id"]])
+                annotations = _canonical_annotations(annotations_by_image[image["id"]])
+                metadata = {
+                    "camera": image.get("camera"),
+                    "recording_conditions": tuple(sorted(image.get("recording_conditions", []))),
+                    "rare_cases": tuple(sorted(image.get("rare_cases", []))),
+                }
                 existing = records.get(image_hash)
-                if existing and existing["boxes"] != boxes:
+                if existing and existing["annotations"] != annotations:
                     raise ValueError(f"Conflicting annotations for image SHA-256 {image_hash}")
                 if existing and existing["split"] != split:
                     raise ValueError(f"Identical image appears in both {existing['split']} and {split}")
+                if existing and existing["metadata"] != metadata:
+                    raise ValueError(f"Conflicting metadata for image SHA-256 {image_hash}")
                 if not existing:
                     records[image_hash] = {
                         "source": image_path,
@@ -78,7 +96,8 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
                         "split": split,
                         "width": image["width"],
                         "height": image["height"],
-                        "boxes": boxes,
+                        "annotations": annotations,
+                        "metadata": metadata,
                     }
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -100,18 +119,23 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
                 filename = f"{digest}{suffix}"
                 destination = image_dir / filename
                 shutil.copyfile(record["source"], destination)
-                images.append(
-                    {
-                        "id": image_id,
-                        "file_name": filename,
-                        "width": record["width"],
-                        "height": record["height"],
-                        "source_id": record["source_id"],
-                        "sha256": digest,
-                    }
-                )
+                released_image = {
+                    "id": image_id,
+                    "file_name": filename,
+                    "width": record["width"],
+                    "height": record["height"],
+                    "source_id": record["source_id"],
+                    "sha256": digest,
+                }
+                for field, value in record["metadata"].items():
+                    if value:
+                        released_image[field] = list(value) if isinstance(value, tuple) else value
+                images.append(released_image)
                 output_files.append({"path": destination.relative_to(staged).as_posix(), "sha256": digest})
-                for box in record["boxes"]:
+                for box, rare_cases in record["annotations"]:
+                    attributes: dict[str, Any] = {"verified": True}
+                    if rare_cases:
+                        attributes["rare_cases"] = list(rare_cases)
                     annotations.append(
                         {
                             "id": len(annotations) + 1,
@@ -121,7 +145,7 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
                             "area": box[2] * box[3],
                             "segmentation": [],
                             "iscrowd": 0,
-                            "attributes": {"verified": True},
+                            "attributes": attributes,
                         }
                     )
             document = {"info": {"dataset_release": release_id, "split": split}, "images": images, "annotations": annotations, "categories": [CATEGORY]}
@@ -130,6 +154,20 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
             annotation_path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
             output_files.append({"path": annotation_path.relative_to(staged).as_posix(), "sha256": sha256(annotation_path)})
             split_summary[split] = {"images": len(images), "annotations": len(annotations), "sources": len({item["source_id"] for item in images})}
+        composition = build_composition_report(staged, release_id=release_id)
+        report_dir = staged / "reports"
+        report_dir.mkdir()
+        json_report = report_dir / "dataset-composition.json"
+        markdown_report = report_dir / "dataset-composition.md"
+        json_report.write_text(json.dumps(composition, indent=2, sort_keys=True) + "\n")
+        markdown_report.write_text(render_composition_markdown(composition))
+        for report_path in (json_report, markdown_report):
+            output_files.append(
+                {
+                    "path": report_path.relative_to(staged).as_posix(),
+                    "sha256": sha256(report_path),
+                }
+            )
         manifest = {
             "schema_version": 1,
             "release_id": release_id,

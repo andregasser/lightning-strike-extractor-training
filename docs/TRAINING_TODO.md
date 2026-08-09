@@ -25,7 +25,7 @@ verified dataset and baseline results exist.
   available.
   **Effort:** Medium. **Expected benefit:** High. Reveals failures hidden by an
   acceptable aggregate score and identifies weak source domains.
-- [ ] Add dataset composition reports for positive and negative images, box
+- [x] Add dataset composition reports for positive and negative images, box
   counts, source distributions, cameras, recording conditions and rare cases.
   **Effort:** Medium. **Expected benefit:** High. Makes imbalance and missing
   coverage visible before they distort training or evaluation.

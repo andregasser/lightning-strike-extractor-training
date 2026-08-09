@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 CATEGORY = {"id": 1, "name": "lightning_channel", "supercategory": "weather"}
+OPTIONAL_LIST_METADATA = ("recording_conditions", "rare_cases")
 
 
 def load_verified_coco(annotation_path: Path, images_root: Path) -> dict[str, Any]:
@@ -37,6 +38,17 @@ def load_verified_coco(annotation_path: Path, images_root: Path) -> dict[str, An
             raise ValueError(f"Image {image['id']} has unsafe file_name")
         if not isinstance(width, int) or width <= 0 or not isinstance(height, int) or height <= 0:
             raise ValueError(f"Image {image['id']} has invalid dimensions")
+        camera = image.get("camera")
+        if camera is not None and (not isinstance(camera, str) or not camera):
+            raise ValueError(f"Image {image['id']} has invalid camera metadata")
+        for field in OPTIONAL_LIST_METADATA:
+            value = image.get(field)
+            if value is not None and (
+                not isinstance(value, list)
+                or not all(isinstance(item, str) and item for item in value)
+                or len(value) != len(set(value))
+            ):
+                raise ValueError(f"Image {image['id']} has invalid {field} metadata")
         if not (images_root / filename).is_file():
             raise ValueError(f"Referenced image does not exist: {images_root / filename}")
         image_by_id[image["id"]] = image
@@ -51,6 +63,13 @@ def load_verified_coco(annotation_path: Path, images_root: Path) -> dict[str, An
             raise ValueError("Annotation references an unknown image or category")
         if annotation.get("attributes", {}).get("verified") is not True:
             raise ValueError(f"Annotation {annotation['id']} is not human-verified")
+        rare_cases = annotation.get("attributes", {}).get("rare_cases")
+        if rare_cases is not None and (
+            not isinstance(rare_cases, list)
+            or not all(isinstance(item, str) and item for item in rare_cases)
+            or len(rare_cases) != len(set(rare_cases))
+        ):
+            raise ValueError(f"Annotation {annotation['id']} has invalid rare_cases metadata")
         box = annotation.get("bbox")
         if not isinstance(box, list) or len(box) != 4 or not all(
             isinstance(value, (int, float)) for value in box

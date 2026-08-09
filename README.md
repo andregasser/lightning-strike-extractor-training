@@ -114,7 +114,16 @@ uv run lse-train release /path/to/verified-dataset \
 The release builder accepts only human-verified annotations, validates image
 dimensions, paths and boxes, deduplicates identical image content by SHA-256,
 rejects conflicting annotations and source/split conflicts, refuses to overwrite
-an existing release, and writes source assignments and output checksums.
+an existing release, and writes source assignments and output checksums. Every
+new release also contains `reports/dataset-composition.json` as the canonical
+composition record and `reports/dataset-composition.md` as its human-readable
+summary. These reports cover positive and negative images, boxes per image,
+sources, cameras, recording conditions, rare-case tags and coverage warnings.
+
+Verified COCO images may provide a non-empty `camera` string plus unique
+`recording_conditions` and `rare_cases` string lists. Annotation attributes may
+also provide a unique `rare_cases` string list for box-specific cases. Missing
+optional metadata remains valid and is reported as unknown coverage.
 
 Releases are immutable inputs to experiments. Create a new release ID when data
 changes; never edit an existing release in place.
@@ -143,6 +152,8 @@ across IoU 0.5–0.95 and a precision-recall curve in JSON and CSV form. Trainin
 evaluates validation loss after every epoch, stops after `--patience`
 non-improving epochs, and saves the best validation checkpoint. Compare models
 on the same immutable release and source-isolated splits before promotion.
+The training report references the checksummed dataset-composition JSON from
+the release so experiment results retain their data-profile provenance.
 
 Use `--initialization imagenet-backbone` or `--initialization random` for a
 controlled transfer-learning comparison. The first COCO-pretrained run may

@@ -165,6 +165,14 @@ def train(
     report = {
         "schema_version": 1,
         "dataset_release": manifest["release_id"],
+        "dataset_composition": next(
+            (
+                item
+                for item in manifest.get("files", [])
+                if item["path"] == "reports/dataset-composition.json"
+            ),
+            None,
+        ),
         "architecture": ARCHITECTURE,
         "initialization": initialization_metadata,
         "device": str(device),

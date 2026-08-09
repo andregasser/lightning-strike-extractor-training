@@ -387,8 +387,11 @@ verified-dataset/
 
 The annotation export must contain the category `lightning_channel`, image
 dimensions, bounding boxes in `[x, y, width, height]` format, source IDs and
-checksums. Keep all frames from one source video in exactly one split. Never
-split adjacent frames from the same source across train and test.
+checksums. Images may additionally contain a non-empty `camera` string and
+unique string lists named `recording_conditions` and `rare_cases`. Annotation
+attributes may contain a unique `rare_cases` string list for box-specific
+cases. Keep all frames from one source video in exactly one split. Never split
+adjacent frames from the same source across train and test.
 
 The current CLI release command validates one or more already verified
 campaigns and creates an immutable release:
@@ -401,8 +404,15 @@ uv run lse-train release \
 ```
 
 The release contains deterministic image names, split annotations, source
-assignments, campaign provenance and checksums. If the data changes, create a
-new release ID; never edit a published release in place.
+assignments, campaign provenance and checksums. During the same atomic release
+operation, it generates `reports/dataset-composition.json` and
+`reports/dataset-composition.md`. The JSON report is canonical; the Markdown
+companion summarizes positive and negative images, box counts, split and source
+distributions, cameras, recording conditions, rare cases and warnings for
+class imbalance or missing metadata. Review it before starting training.
+Training records the report path and SHA-256 from the release manifest in
+`training.json`. If the data changes, create a new release ID; never edit a
+published release in place.
 
 ## 6. Train the first baseline
 
@@ -435,11 +445,11 @@ checkpoint, not necessarily the final epoch. Set `--patience 0` only when you
 intentionally want to stop at the first non-improving epoch; use a larger value
 for noisy validation curves.
 
-`training.json` records the dataset release, architecture, exact initialization
-mode and weight identifiers, device, requested and completed epochs, seed,
-training losses, validation losses and early-stopping metadata. Treat the
-checkpoint and report as one experiment; do not rename or detach them from
-their dataset release.
+`training.json` records the dataset release, the composition-report path and
+checksum, architecture, exact initialization mode and weight identifiers,
+device, requested and completed epochs, seed, training losses, validation
+losses and early-stopping metadata. Treat the checkpoint and report as one
+experiment; do not rename or detach them from their dataset release.
 
 Run controlled initialization comparisons with otherwise identical settings:
 

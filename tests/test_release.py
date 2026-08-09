@@ -41,6 +41,14 @@ def test_builds_hashed_immutable_release() -> None:
         assert image.stem == sha256(image)
         assert manifest["splits"]["train"] == {"images": 1, "annotations": 1, "sources": 1}
         assert json.loads((output / "manifest.json").read_text())["release_id"] == "lightning-v1"
+        assert (output / "reports" / "dataset-composition.json").is_file()
+        assert (output / "reports" / "dataset-composition.md").is_file()
+        composition = json.loads(
+            (output / "reports" / "dataset-composition.json").read_text()
+        )
+        assert "class-imbalance" in {
+            warning["code"] for warning in composition["warnings"]
+        }
 
 
 def test_rejects_conflicting_annotations_for_identical_image() -> None:
@@ -50,3 +58,19 @@ def test_rejects_conflicting_annotations_for_identical_image() -> None:
         second = campaign(root, "campaign-b", box=[2, 2, 10, 12])
         with pytest.raises(ValueError, match="Conflicting annotations"):
             build_release([first, second], root / "release", release_id="lightning-v1")
+
+
+def test_rejects_invalid_composition_metadata_before_publication() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        source = campaign(root, "campaign-a")
+        annotation_path = source / "annotations" / "instances_train.json"
+        document = json.loads(annotation_path.read_text())
+        document["images"][0]["recording_conditions"] = ["night", "night"]
+        annotation_path.write_text(json.dumps(document))
+        output = root / "release"
+
+        with pytest.raises(ValueError, match="invalid recording_conditions metadata"):
+            build_release([source], output, release_id="lightning-v1")
+
+        assert not output.exists()
