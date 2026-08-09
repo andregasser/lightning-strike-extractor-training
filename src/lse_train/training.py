@@ -173,6 +173,14 @@ def train(
             ),
             None,
         ),
+        "dataset_split_audit": next(
+            (
+                item
+                for item in manifest.get("files", [])
+                if item["path"] == "reports/split-audit.json"
+            ),
+            None,
+        ),
         "architecture": ARCHITECTURE,
         "initialization": initialization_metadata,
         "device": str(device),

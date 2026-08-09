@@ -74,3 +74,19 @@ def test_rejects_invalid_composition_metadata_before_publication() -> None:
             build_release([source], output, release_id="lightning-v1")
 
         assert not output.exists()
+
+
+def test_rejects_invalid_split_group_metadata_before_publication() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        source = campaign(root, "campaign-a")
+        annotation_path = source / "annotations" / "instances_train.json"
+        document = json.loads(annotation_path.read_text())
+        document["images"][0]["event_group_id"] = ""
+        annotation_path.write_text(json.dumps(document))
+        output = root / "release"
+
+        with pytest.raises(ValueError, match="invalid event_group_id metadata"):
+            build_release([source], output, release_id="lightning-v1")
+
+        assert not output.exists()

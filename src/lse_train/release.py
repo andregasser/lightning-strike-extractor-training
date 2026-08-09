@@ -11,6 +11,7 @@ from typing import Any
 
 from .coco import CATEGORY, load_verified_coco
 from .composition import build_composition_report, render_composition_markdown
+from .split_audit import GROUP_FIELDS, build_split_audit, render_split_audit_markdown
 
 SPLITS = ("train", "validation", "test")
 
@@ -48,7 +49,7 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
 
     records: dict[str, dict[str, Any]] = {}
     campaign_metadata: list[dict[str, Any]] = []
-    source_splits: dict[str, str] = {}
+    group_splits: dict[str, dict[str, str]] = {field: {} for field in GROUP_FIELDS}
     for campaign_path in campaigns:
         campaign = campaign_path.resolve()
         manifest_path = campaign / "manifest.json"
@@ -71,9 +72,15 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
                 annotations_by_image[annotation["image_id"]].append(annotation)
             for image in document["images"]:
                 source_id = image["source_id"]
-                previous_split = source_splits.setdefault(source_id, split)
-                if previous_split != split:
-                    raise ValueError(f"Source {source_id} appears in both {previous_split} and {split}")
+                for field in GROUP_FIELDS:
+                    group_id = image.get(field)
+                    if group_id is None:
+                        continue
+                    previous_split = group_splits[field].setdefault(group_id, split)
+                    if previous_split != split:
+                        raise ValueError(
+                            f"{field} {group_id} appears in both {previous_split} and {split}"
+                        )
                 image_path = images_root / image["file_name"]
                 image_hash = sha256(image_path)
                 annotations = _canonical_annotations(annotations_by_image[image["id"]])
@@ -81,6 +88,9 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
                     "camera": image.get("camera"),
                     "recording_conditions": tuple(sorted(image.get("recording_conditions", []))),
                     "rare_cases": tuple(sorted(image.get("rare_cases", []))),
+                    "recording_group_id": image.get("recording_group_id"),
+                    "event_group_id": image.get("event_group_id"),
+                    "duplicate_group_id": image.get("duplicate_group_id"),
                 }
                 existing = records.get(image_hash)
                 if existing and existing["annotations"] != annotations:
@@ -161,7 +171,17 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
         markdown_report = report_dir / "dataset-composition.md"
         json_report.write_text(json.dumps(composition, indent=2, sort_keys=True) + "\n")
         markdown_report.write_text(render_composition_markdown(composition))
-        for report_path in (json_report, markdown_report):
+        split_audit = build_split_audit(staged, release_id=release_id)
+        split_audit_json = report_dir / "split-audit.json"
+        split_audit_markdown = report_dir / "split-audit.md"
+        split_audit_json.write_text(json.dumps(split_audit, indent=2, sort_keys=True) + "\n")
+        split_audit_markdown.write_text(render_split_audit_markdown(split_audit))
+        for report_path in (
+            json_report,
+            markdown_report,
+            split_audit_json,
+            split_audit_markdown,
+        ):
             output_files.append(
                 {
                     "path": report_path.relative_to(staged).as_posix(),
@@ -173,7 +193,17 @@ def build_release(campaigns: list[Path], output: Path, *, release_id: str) -> di
             "release_id": release_id,
             "category_schema": [CATEGORY],
             "campaigns": campaign_metadata,
-            "source_assignments": dict(sorted(source_splits.items())),
+            "source_assignments": dict(sorted(group_splits["source_id"].items())),
+            "split_group_assignments": {
+                field: dict(sorted(assignments.items()))
+                for field, assignments in group_splits.items()
+            },
+            "split_audit": {
+                "status": split_audit["status"],
+                "cross_split_near_duplicate_groups": len(
+                    split_audit["near_duplicate_check"]["cross_split_groups"]
+                ),
+            },
             "splits": split_summary,
             "files": sorted(output_files, key=lambda item: item["path"]),
         }

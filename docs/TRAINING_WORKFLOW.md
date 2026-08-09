@@ -390,8 +390,12 @@ dimensions, bounding boxes in `[x, y, width, height]` format, source IDs and
 checksums. Images may additionally contain a non-empty `camera` string and
 unique string lists named `recording_conditions` and `rare_cases`. Annotation
 attributes may contain a unique `rare_cases` string list for box-specific
-cases. Keep all frames from one source video in exactly one split. Never split
-adjacent frames from the same source across train and test.
+cases. Use `recording_group_id` for files belonging to one continuous camera
+session, `event_group_id` for frames of one lightning event and
+`duplicate_group_id` for originals, transcodes or crops of one recording. These
+IDs are optional for compatibility, but every known relationship should be
+recorded. Keep all frames from one source video in exactly one split. Never
+split adjacent frames from the same source across train and test.
 
 The current CLI release command validates one or more already verified
 campaigns and creates an immutable release:
@@ -406,13 +410,28 @@ uv run lse-train release \
 The release contains deterministic image names, split annotations, source
 assignments, campaign provenance and checksums. During the same atomic release
 operation, it generates `reports/dataset-composition.json` and
-`reports/dataset-composition.md`. The JSON report is canonical; the Markdown
+`reports/dataset-composition.md`, plus `reports/split-audit.json` and
+`reports/split-audit.md`. The JSON reports are canonical; the Markdown
 companion summarizes positive and negative images, box counts, split and source
 distributions, cameras, recording conditions, rare cases and warnings for
 class imbalance or missing metadata. Review it before starting training.
-Training records the report path and SHA-256 from the release manifest in
-`training.json`. If the data changes, create a new release ID; never edit a
-published release in place.
+
+The split audit applies two levels of control:
+
+1. A repeated `source_id`, `recording_group_id`, `event_group_id` or
+   `duplicate_group_id` across splits is a hard error and aborts the atomic
+   release before publication.
+2. A 64-bit difference hash groups visually similar images across splits at a
+   Hamming distance of at most four. These groups set the audit status to
+   `review-required`, but do not automatically reject the release because dark
+   skies and saturated flashes can create false positives. Curators must review
+   and encode confirmed relationships with a stable group ID in a new release.
+
+Candidate search uses five hash bands, so it avoids comparing every image with
+every other image while retaining every pair within the configured Hamming
+distance. Training records both canonical report paths and SHA-256 checksums
+from the release manifest in `training.json`. If the data changes, create a new
+release ID; never edit a published release in place.
 
 ## 6. Train the first baseline
 
@@ -445,11 +464,11 @@ checkpoint, not necessarily the final epoch. Set `--patience 0` only when you
 intentionally want to stop at the first non-improving epoch; use a larger value
 for noisy validation curves.
 
-`training.json` records the dataset release, the composition-report path and
-checksum, architecture, exact initialization mode and weight identifiers,
-device, requested and completed epochs, seed, training losses, validation
-losses and early-stopping metadata. Treat the checkpoint and report as one
-experiment; do not rename or detach them from their dataset release.
+`training.json` records the dataset release, composition- and split-audit report
+paths and checksums, architecture, exact initialization mode and weight
+identifiers, device, requested and completed epochs, seed, training losses,
+validation losses and early-stopping metadata. Treat the checkpoint and report
+as one experiment; do not rename or detach them from their dataset release.
 
 Run controlled initialization comparisons with otherwise identical settings:
 

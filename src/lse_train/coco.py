@@ -6,6 +6,7 @@ from typing import Any
 
 CATEGORY = {"id": 1, "name": "lightning_channel", "supercategory": "weather"}
 OPTIONAL_LIST_METADATA = ("recording_conditions", "rare_cases")
+OPTIONAL_GROUP_METADATA = ("recording_group_id", "event_group_id", "duplicate_group_id")
 
 
 def load_verified_coco(annotation_path: Path, images_root: Path) -> dict[str, Any]:
@@ -41,6 +42,10 @@ def load_verified_coco(annotation_path: Path, images_root: Path) -> dict[str, An
         camera = image.get("camera")
         if camera is not None and (not isinstance(camera, str) or not camera):
             raise ValueError(f"Image {image['id']} has invalid camera metadata")
+        for field in OPTIONAL_GROUP_METADATA:
+            value = image.get(field)
+            if value is not None and (not isinstance(value, str) or not value):
+                raise ValueError(f"Image {image['id']} has invalid {field} metadata")
         for field in OPTIONAL_LIST_METADATA:
             value = image.get(field)
             if value is not None and (

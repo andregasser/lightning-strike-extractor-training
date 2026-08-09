@@ -21,9 +21,16 @@ def _campaign(root: Path) -> Path:
                 "camera": "sony-a7",
                 "recording_conditions": ["night", "rain"],
                 "rare_cases": ["frame-edge"],
+                "recording_group_id": "session-a",
+                "event_group_id": "event-a",
                 "boxes": [([1, 2, 8, 10], ["faint-channel"]), ([12, 3, 4, 8], [])],
             },
-            {"name": "negative.jpg", "source_id": "storm-a", "boxes": []},
+            {
+                "name": "negative.jpg",
+                "source_id": "storm-a",
+                "recording_group_id": "session-a",
+                "boxes": [],
+            },
         ],
         "validation": [
             {
@@ -31,6 +38,8 @@ def _campaign(root: Path) -> Path:
                 "source_id": "storm-b",
                 "camera": "iphone-15",
                 "recording_conditions": ["day"],
+                "recording_group_id": "session-b",
+                "duplicate_group_id": "original-b",
                 "boxes": [([2, 2, 5, 6], [])],
             }
         ],
@@ -51,7 +60,14 @@ def _campaign(root: Path) -> Path:
                 "height": 20,
                 "source_id": spec["source_id"],
             }
-            for field in ("camera", "recording_conditions", "rare_cases"):
+            for field in (
+                "camera",
+                "recording_conditions",
+                "rare_cases",
+                "recording_group_id",
+                "event_group_id",
+                "duplicate_group_id",
+            ):
                 if field in spec:
                     image[field] = spec[field]
             images.append(image)
@@ -116,6 +132,31 @@ def test_release_writes_json_and_markdown_composition_reports() -> None:
         assert tracked["reports/dataset-composition.md"] == sha256(markdown_path)
 
 
+def test_release_writes_split_audit_and_flags_visual_near_duplicates() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        output = root / "release"
+        manifest = build_release([_campaign(root)], output, release_id="lightning-v1")
+        report_path = output / "reports" / "split-audit.json"
+        markdown_path = output / "reports" / "split-audit.md"
+        report = json.loads(report_path.read_text())
+
+        assert report["status"] == "review-required"
+        assert report["images_checked"] == 3
+        assert report["hard_group_checks"]["source_id"]["status"] == "passed"
+        assert report["hard_group_checks"]["recording_group_id"]["groups"] == 2
+        assert report["near_duplicate_check"]["algorithm"] == "difference-hash-64"
+        assert len(report["near_duplicate_check"]["cross_split_groups"]) == 1
+        assert manifest["split_audit"] == {
+            "status": "review-required",
+            "cross_split_near_duplicate_groups": 1,
+        }
+        assert "Status: review-required" in markdown_path.read_text()
+        tracked = {item["path"]: item["sha256"] for item in manifest["files"]}
+        assert tracked["reports/split-audit.json"] == sha256(report_path)
+        assert tracked["reports/split-audit.md"] == sha256(markdown_path)
+
+
 def test_release_reports_missing_metadata() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -149,4 +190,27 @@ def test_release_preserves_composition_metadata() -> None:
 
         assert positive["recording_conditions"] == ["night", "rain"]
         assert positive["rare_cases"] == ["frame-edge"]
+        assert positive["recording_group_id"] == "session-a"
+        assert positive["event_group_id"] == "event-a"
         assert rare_annotation["attributes"]["rare_cases"] == ["faint-channel"]
+
+
+def test_release_rejects_recording_group_crossing_splits() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        campaign = _campaign(root)
+        annotation_path = campaign / "annotations" / "instances_validation.json"
+        document = json.loads(annotation_path.read_text())
+        document["images"][0]["recording_group_id"] = "session-a"
+        annotation_path.write_text(json.dumps(document))
+        output = root / "release"
+
+        try:
+            build_release([campaign], output, release_id="lightning-v1")
+        except ValueError as error:
+            assert str(error) == (
+                "recording_group_id session-a appears in both train and validation"
+            )
+        else:
+            raise AssertionError("Expected cross-split recording group to be rejected")
+        assert not output.exists()

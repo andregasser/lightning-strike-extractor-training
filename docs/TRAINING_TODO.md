@@ -29,7 +29,7 @@ verified dataset and baseline results exist.
   counts, source distributions, cameras, recording conditions and rare cases.
   **Effort:** Medium. **Expected benefit:** High. Makes imbalance and missing
   coverage visible before they distort training or evaluation.
-- [ ] Audit split groups so contiguous or near-duplicate recordings cannot cross
+- [x] Audit split groups so contiguous or near-duplicate recordings cannot cross
   train, validation and test boundaries.
   **Effort:** Medium. **Expected benefit:** Very high. Prevents data leakage and
   unrealistically optimistic validation or test results.

@@ -125,6 +125,14 @@ Verified COCO images may provide a non-empty `camera` string plus unique
 also provide a unique `rare_cases` string list for box-specific cases. Missing
 optional metadata remains valid and is reported as unknown coverage.
 
+Split integrity is checked at the same time. `source_id`,
+`recording_group_id`, `event_group_id` and `duplicate_group_id` are treated as
+indivisible groups and a cross-split assignment aborts publication. The release
+also contains checksummed `reports/split-audit.json` and
+`reports/split-audit.md` files. A 64-bit difference hash finds visually similar
+images across splits; these candidates require review because perceptual
+similarity is evidence, not proof, of duplicate recordings.
+
 Releases are immutable inputs to experiments. Create a new release ID when data
 changes; never edit an existing release in place.
 
@@ -152,8 +160,9 @@ across IoU 0.5–0.95 and a precision-recall curve in JSON and CSV form. Trainin
 evaluates validation loss after every epoch, stops after `--patience`
 non-improving epochs, and saves the best validation checkpoint. Compare models
 on the same immutable release and source-isolated splits before promotion.
-The training report references the checksummed dataset-composition JSON from
-the release so experiment results retain their data-profile provenance.
+The training report references the checksummed dataset-composition and split
+audit JSON files from the release so experiment results retain their data and
+split-integrity provenance.
 
 Use `--initialization imagenet-backbone` or `--initialization random` for a
 controlled transfer-learning comparison. The first COCO-pretrained run may
