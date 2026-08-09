@@ -35,9 +35,20 @@ is never copied into either repository.
 
 ## 2. Start with raw videos and create candidate frames
 
-Run the inference repository against each source video. First inspect the media
-and then analyze it. The time range is optional; using a short range is useful
-for a first smoke test.
+Run the inference repository against each source video. The workflow has two
+different commands here:
+
+- `inspect` is a read-only media check. It probes the input with `ffprobe` and
+  reports duration, frame rate, resolution, codecs and audio availability. It
+  does not scan frames, create detections or write an analysis run. Use it to
+  validate a file and discover safe time ranges before processing.
+- `analyze` performs the actual video analysis. It decodes frames, detects
+  lightning candidates, ranks events and writes an isolated run with metadata,
+  metrics and reviewable outputs. Use it when you want data that can later be
+  exported into a handoff.
+
+The time range is optional; using a short range is useful for a first smoke
+test.
 
 ```bash
 cd ../lightning-strike-extractor
