@@ -17,7 +17,7 @@ verified dataset and baseline results exist.
   **Effort:** Medium. **Expected benefit:** Very high. Transfers general visual
   features and detector localization behavior while preserving controlled
   baselines for measuring the actual gain.
-- [ ] Add Average Precision, mAP at IoU 0.5, COCO-style mAP across IoU 0.5–0.95
+- [x] Add Average Precision, mAP at IoU 0.5, COCO-style mAP across IoU 0.5–0.95
   and precision-recall curves.
   **Effort:** Medium. **Expected benefit:** Very high. Replaces single-threshold
   conclusions with standard detection-quality measurements across thresholds.

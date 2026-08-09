@@ -46,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     evaluation.add_argument("checkpoint", type=Path)
     evaluation.add_argument("--output", required=True, type=Path)
     evaluation.add_argument("--split", choices=("validation", "test"), default="validation")
+    evaluation.add_argument("--score-threshold", type=float, default=0.25)
+    evaluation.add_argument("--iou-threshold", type=float, default=0.5)
     export = commands.add_parser("export-onnx", help="Export and parity-check an ONNX release")
     export.add_argument("checkpoint", type=Path)
     export.add_argument("--training-report", required=True, type=Path)
@@ -73,7 +75,14 @@ def main(argv: list[str] | None = None) -> int:
             initialization=args.initialization,
         )
     elif args.command == "evaluate":
-        result = evaluate(args.release, args.checkpoint, args.output, split=args.split)
+        result = evaluate(
+            args.release,
+            args.checkpoint,
+            args.output,
+            split=args.split,
+            score_threshold=args.score_threshold,
+            iou_threshold=args.iou_threshold,
+        )
     else:
         result = export_onnx_release(
             args.checkpoint,

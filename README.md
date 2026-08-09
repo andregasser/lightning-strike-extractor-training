@@ -138,10 +138,11 @@ uv run lse-train evaluate releases/lightning-2026.08.1 \
 ```
 
 Evaluation reports true positives, false positives, false negatives, precision
-and recall at a documented IoU and confidence threshold. Training evaluates
-validation loss after every epoch, stops after `--patience` non-improving
-epochs, and saves the best validation checkpoint. Compare multiple
-architectures on the same release before production promotion.
+and recall at a documented operating point, plus AP at IoU 0.5, COCO-style mAP
+across IoU 0.5–0.95 and a precision-recall curve in JSON and CSV form. Training
+evaluates validation loss after every epoch, stops after `--patience`
+non-improving epochs, and saves the best validation checkpoint. Compare models
+on the same immutable release and source-isolated splits before promotion.
 
 Use `--initialization imagenet-backbone` or `--initialization random` for a
 controlled transfer-learning comparison. The first COCO-pretrained run may

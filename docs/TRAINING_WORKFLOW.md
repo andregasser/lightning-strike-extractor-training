@@ -485,14 +485,23 @@ uv run lse-train evaluate \
   releases/datasets/lightning-2026.08.1 \
   experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/checkpoint.pt \
   --split validation \
+  --score-threshold 0.25 \
+  --iou-threshold 0.5 \
   --output experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/validation.json
 ```
 
-The report includes true positives, false positives, false negatives,
-precision and recall. The current defaults are confidence `0.25` and IoU `0.5`.
-Record the thresholds when comparing models. A model is not better merely
-because recall increased: inspect false positives, false negatives and source-
-isolated results as well.
+The JSON report includes true positives, false positives, false negatives,
+precision and recall at the selected operating point. It also includes AP at
+IoU 0.5, COCO-style mAP averaged across IoU thresholds 0.5–0.95, per-IoU AP and
+the full IoU-0.5 precision-recall curve. A sibling
+`validation-pr-curve.csv` file contains the curve in tabular form. The current
+operating-point defaults are confidence `0.25` and IoU `0.5`.
+
+AP and mAP use every model score and therefore compare ranking quality without
+depending on the selected operating-point confidence. Do not interpret one
+metric in isolation: inspect AP, strict-IoU mAP, false positives, false
+negatives, the precision-recall tradeoff and source-isolated results before
+deciding that a candidate is better.
 
 ## 8. Export and verify an ONNX release
 
@@ -501,9 +510,9 @@ the dataset release and training report are the intended inputs:
 
 ```bash
 uv run lse-train export-onnx \
-  experiments/2026-08-09-fasterrcnn-mobilenet/checkpoint.pt \
-  --training-report experiments/2026-08-09-fasterrcnn-mobilenet/training.json \
-  --evaluation-report experiments/2026-08-09-fasterrcnn-mobilenet/validation.json \
+  experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/checkpoint.pt \
+  --training-report experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/training.json \
+  --evaluation-report experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/validation.json \
   --version 0.1.0 \
   --output releases/models/lightning-channel-detector-0.1.0
 ```
