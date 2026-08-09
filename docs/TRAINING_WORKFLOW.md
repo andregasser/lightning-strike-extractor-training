@@ -130,7 +130,7 @@ It reduces hours of video to a reviewable set of likely channel frames:
 The resulting metrics are written to the analysis run, primarily:
 
 ```text
-runs/videos/<run>/
+runs/videos/<video-run-id>/
 ├── source.json
 ├── run.json
 ├── results/
@@ -153,7 +153,7 @@ uv sync --extra dev
 uv run lse inspect /data/storms/2026-08-09/camera-a.mp4
 uv run lse analyze /data/storms/2026-08-09/camera-a.mp4 \
   --start 0 --end 600 \
-  --output runs/videos/camera-a-2026-08-09
+  --output runs
 ```
 
 For a batch of videos, use the batch commands documented in the inference
@@ -193,7 +193,7 @@ portable directory with `manifest.json`, images, source IDs, frame numbers,
 timestamps, candidate metrics and SHA-256 checksums.
 
 ```bash
-uv run python -m lse.dataset_export runs/videos/camera-a-2026-08-09 \
+uv run python -m lse.dataset_export runs \
   --output /data/handoffs/lightning-2026-08-09-camera-a \
   --max-events-per-video 200 \
   --context-frames 2
