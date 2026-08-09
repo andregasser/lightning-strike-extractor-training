@@ -76,7 +76,17 @@ different commands here:
   lightning candidates, ranks events and writes an isolated run with metadata,
   metrics and reviewable outputs. During analysis, the probed source metadata
   is persisted inside the run as `source.json`, alongside run state and result
-  files. Use it when you want data that can later be exported into a handoff.
+  files. The run root defaults to `runs`, so the normal command does not need an
+  explicit output path:
+
+  ```bash
+  uv run lse analyze /data/storms/2026-08-09/camera-a.mp4 \
+    --start 0 --end 600
+  ```
+
+  This creates a run below `runs/videos/<video-run-id>/`. Use `--output` only
+  when you intentionally want to place the complete run tree elsewhere. Use
+  `analyze` when you want data that can later be exported into a handoff.
 
 The time range is optional; using a short range is useful for a first smoke
 test.
@@ -145,16 +155,6 @@ and adds neighboring context frames. Thresholds remain configurable because
 camera noise, exposure, frame rate and weather vary; changing them is an
 inference-pipeline experiment and should be recorded separately from model
 training.
-
-```bash
-cd ../lightning-strike-extractor
-uv sync --extra dev
-
-uv run lse inspect /data/storms/2026-08-09/camera-a.mp4
-uv run lse analyze /data/storms/2026-08-09/camera-a.mp4 \
-  --start 0 --end 600 \
-  --output runs
-```
 
 For a batch of videos, use the batch commands documented in the inference
 repository. The important output is an analysis run containing candidate
