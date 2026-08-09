@@ -23,7 +23,7 @@ ONNX bundles; this training repo must never import or install the CLI.
 
 - Production training code lives in `src/lightning_model_lab/`.
 - The CLI entry point is `lightning_model_lab.cli:main` and is exposed as
-  `lightning-model` through `pyproject.toml`.
+  `lse-train` through `pyproject.toml`.
 - Annotation-format adapters and local utilities live in `tools/`.
 - Tests live in `tests/` and use `pytest`.
 - The training repository must never import `lightning_extractor` or require the product
@@ -55,10 +55,10 @@ uv run ruff check .
 Useful commands:
 
 ```bash
-uv run lightning-model --help
-uv run lightning-model import-handoff /path/to/frame-export \
+uv run lse-train --help
+uv run lse-train import-handoff /path/to/frame-export \
   --output campaigns/example
-uv run lightning-model release /path/to/verified-dataset \
+uv run lse-train release /path/to/verified-dataset \
   --release-id example-2026.08 --output releases/example-2026.08
 ```
 

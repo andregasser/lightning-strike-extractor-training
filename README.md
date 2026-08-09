@@ -68,7 +68,7 @@ uv run python -m lightning_extractor.dataset_export runs \
 Import it here:
 
 ```bash
-uv run lightning-model import-handoff /path/to/frame-export \
+uv run lse-train import-handoff /path/to/frame-export \
   --output campaigns/storm-2026-08
 ```
 
@@ -106,7 +106,7 @@ frames from the same source across train and test produces misleading metrics.
 ## Build an immutable dataset release
 
 ```bash
-uv run lightning-model release /path/to/verified-dataset \
+uv run lse-train release /path/to/verified-dataset \
   --release-id lightning-2026.08.1 \
   --output releases/lightning-2026.08.1
 ```
@@ -125,10 +125,10 @@ The current implementation provides a reproducible Faster R-CNN/MobileNet
 baseline. It is a reference point, not a final architecture decision.
 
 ```bash
-uv run lightning-model train releases/lightning-2026.08.1 \
+uv run lse-train train releases/lightning-2026.08.1 \
   --output experiments/baseline --epochs 10 --seed 17
 
-uv run lightning-model evaluate releases/lightning-2026.08.1 \
+uv run lse-train evaluate releases/lightning-2026.08.1 \
   experiments/baseline/checkpoint.pt --split validation \
   --output experiments/baseline/validation.json
 ```
@@ -140,7 +140,7 @@ architectures on the same release before production promotion.
 ## Export and verify ONNX
 
 ```bash
-uv run lightning-model export-onnx experiments/baseline/checkpoint.pt \
+uv run lse-train export-onnx experiments/baseline/checkpoint.pt \
   --training-report experiments/baseline/training.json \
   --evaluation-report experiments/baseline/validation.json \
   --version 0.1.0 --output releases/model-0.1.0
@@ -177,7 +177,7 @@ src/lightning_model_lab/
 ├── training.py         # baseline training
 ├── evaluation.py       # candidate evaluation
 ├── onnx_release.py     # export and parity checks
-└── cli.py              # lightning-model entry point
+└── cli.py              # lse-train entry point
 tools/                  # annotation-format adapters and local utilities
 tests/                  # deterministic training tests
 ```

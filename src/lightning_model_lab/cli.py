@@ -12,7 +12,7 @@ from .training import train
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="lightning-model")
+    parser = argparse.ArgumentParser(prog="lse-train")
     commands = parser.add_subparsers(dest="command", required=True)
     release = commands.add_parser("release", help="Build an immutable verified dataset release")
     release.add_argument("campaigns", nargs="+", type=Path)

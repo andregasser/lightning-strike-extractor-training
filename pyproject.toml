@@ -22,7 +22,7 @@ train = [
 dev = ["pytest>=8", "ruff>=0.9"]
 
 [project.scripts]
-lightning-model = "lightning_model_lab.cli:main"
+lse-train = "lightning_model_lab.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lightning_model_lab"]
