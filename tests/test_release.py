@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import pytest
 
-from lightning_model_lab.release import build_release, sha256
+from lse_train.release import build_release, sha256
 
 
 def campaign(root: Path, name: str, *, box: list[int] | None = None) -> Path:

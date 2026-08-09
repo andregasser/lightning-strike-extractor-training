@@ -11,7 +11,7 @@ This repository owns the complete model lifecycle: importing neutral frame
 handoffs, preparing annotation campaigns, creating immutable dataset releases,
 training and evaluating detector candidates, and exporting verified ONNX model
 bundles. It is deliberately independent from the video-analysis CLI and must
-never import or install `lightning_extractor`.
+never import or install `lse`.
 
 The [product repository](https://github.com/andregasser/lightning-strike-extractor)
 consumes one thing from this project: a released ONNX bundle with a manifest and
@@ -61,7 +61,7 @@ The product CLI is not required and must not be installed in this environment.
 Create a neutral handoff in the video repository:
 
 ```bash
-uv run python -m lightning_extractor.dataset_export runs \
+uv run python -m lse.dataset_export runs \
   --output /path/to/frame-export
 ```
 
@@ -170,7 +170,7 @@ downloads research checkpoints implicitly.
 ## Repository layout
 
 ```text
-src/lightning_model_lab/
+src/lse_train/
 ├── handoff.py          # frame handoff validation and campaigns
 ├── coco.py             # verified dataset validation
 ├── release.py          # immutable dataset releases

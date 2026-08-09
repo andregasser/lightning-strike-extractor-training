@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "lightning-model-lab"
+name = "lse-train"
 version = "0.1.0"
 description = "Independent Lightning Strike Extractor dataset, training, evaluation, and ONNX release pipeline"
 requires-python = ">=3.11"
@@ -22,10 +22,10 @@ train = [
 dev = ["pytest>=8", "ruff>=0.9"]
 
 [project.scripts]
-lse-train = "lightning_model_lab.cli:main"
+lse-train = "lse_train.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/lightning_model_lab"]
+packages = ["src/lse_train"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

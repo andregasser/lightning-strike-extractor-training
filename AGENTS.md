@@ -21,12 +21,12 @@ ONNX bundles; this training repo must never import or install the CLI.
 
 ## Architecture
 
-- Production training code lives in `src/lightning_model_lab/`.
-- The CLI entry point is `lightning_model_lab.cli:main` and is exposed as
+- Production training code lives in `src/lse_train/`.
+- The CLI entry point is `lse_train.cli:main` and is exposed as
   `lse-train` through `pyproject.toml`.
 - Annotation-format adapters and local utilities live in `tools/`.
 - Tests live in `tests/` and use `pytest`.
-- The training repository must never import `lightning_extractor` or require the product
+- The training repository must never import `lse` or require the product
   repository to be installed.
 - The only product-facing output is a released ONNX bundle with manifest and
   checksums. Training checkpoints and annotation work products stay here.

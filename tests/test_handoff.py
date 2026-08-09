@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import pytest
 
-from lightning_model_lab.handoff import import_handoff
+from lse_train.handoff import import_handoff
 
 
 def make_handoff(root: Path) -> Path:
