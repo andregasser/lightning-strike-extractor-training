@@ -460,15 +460,34 @@ experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/
 Training evaluates the validation split after every epoch. If validation loss
 does not improve by at least `--min-delta` for `--patience` consecutive epochs,
 training stops early. The saved `checkpoint.pt` is always the best validation
-checkpoint, not necessarily the final epoch. Set `--patience 0` only when you
-intentionally want to stop at the first non-improving epoch; use a larger value
-for noisy validation curves.
+checkpoint, not necessarily the final epoch.
+
+By default, `ReduceLROnPlateau` monitors the same validation loss. It multiplies
+the learning rate by `0.3` after two plateau epochs and never reduces it below
+`1e-6`. The initial AdamW learning rate is `1e-4`. Configure these values with
+`--learning-rate`, `--scheduler-factor`, `--scheduler-patience` and
+`--min-learning-rate`. Early-stopping patience must exceed scheduler patience
+by at least two epochs so the reduced rate is used for a subsequent epoch. The
+defaults of five and two satisfy this rule.
+
+Use `--no-scheduler` for a controlled fixed-rate baseline. This also permits a
+shorter early-stopping patience, including `--patience 0` when stopping at the
+first non-improving epoch is intentional:
+
+```bash
+uv run lse-train train releases/datasets/lightning-2026.08.1 \
+  --output experiments/fixed-learning-rate \
+  --learning-rate 1e-4 \
+  --no-scheduler
+```
 
 `training.json` records the dataset release, composition- and split-audit report
 paths and checksums, architecture, exact initialization mode and weight
-identifiers, device, requested and completed epochs, seed, training losses,
-validation losses and early-stopping metadata. Treat the checkpoint and report
-as one experiment; do not rename or detach them from their dataset release.
+identifiers, device, requested and completed epochs, seed, complete AdamW and
+scheduler configuration, the rate used and selected for every epoch, explicit
+reduction events, final learning rate, training losses, validation losses and
+early-stopping metadata. Treat the checkpoint and report as one experiment; do
+not rename or detach them from their dataset release.
 
 Run controlled initialization comparisons with otherwise identical settings:
 

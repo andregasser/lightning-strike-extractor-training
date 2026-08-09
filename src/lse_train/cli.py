@@ -9,7 +9,13 @@ from .handoff import import_handoff
 from .model import INITIALIZATIONS
 from .onnx_release import export_onnx_release
 from .release import build_release
-from .training import train
+from .training import (
+    DEFAULT_LEARNING_RATE,
+    DEFAULT_MIN_LEARNING_RATE,
+    DEFAULT_SCHEDULER_FACTOR,
+    DEFAULT_SCHEDULER_PATIENCE,
+    train,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,6 +36,35 @@ def main(argv: list[str] | None = None) -> int:
     training.add_argument("--seed", type=int, default=17)
     training.add_argument("--patience", type=int, default=5)
     training.add_argument("--min-delta", type=float, default=0.0)
+    training.add_argument(
+        "--learning-rate",
+        type=float,
+        default=DEFAULT_LEARNING_RATE,
+        help="Set the initial AdamW learning rate",
+    )
+    training.add_argument(
+        "--scheduler-factor",
+        type=float,
+        default=DEFAULT_SCHEDULER_FACTOR,
+        help="Multiply the learning rate by this factor after a validation plateau",
+    )
+    training.add_argument(
+        "--scheduler-patience",
+        type=int,
+        default=DEFAULT_SCHEDULER_PATIENCE,
+        help="Wait this many plateau epochs before reducing the learning rate",
+    )
+    training.add_argument(
+        "--min-learning-rate",
+        type=float,
+        default=DEFAULT_MIN_LEARNING_RATE,
+        help="Do not reduce the learning rate below this value",
+    )
+    training.add_argument(
+        "--no-scheduler",
+        action="store_true",
+        help="Keep a fixed learning rate for a controlled baseline run",
+    )
     training.add_argument(
         "--initialization",
         choices=INITIALIZATIONS,
@@ -73,6 +108,11 @@ def main(argv: list[str] | None = None) -> int:
             min_delta=args.min_delta,
             augment=not args.no_augmentation,
             initialization=args.initialization,
+            learning_rate=args.learning_rate,
+            scheduler_enabled=not args.no_scheduler,
+            scheduler_factor=args.scheduler_factor,
+            scheduler_patience=args.scheduler_patience,
+            min_learning_rate=args.min_learning_rate,
         )
     elif args.command == "evaluate":
         result = evaluate(

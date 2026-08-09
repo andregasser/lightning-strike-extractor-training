@@ -33,7 +33,7 @@ verified dataset and baseline results exist.
   train, validation and test boundaries.
   **Effort:** Medium. **Expected benefit:** Very high. Prevents data leakage and
   unrealistically optimistic validation or test results.
-- [ ] Add a learning-rate scheduler and record its complete configuration and
+- [x] Add a learning-rate scheduler and record its complete configuration and
   learning-rate history in the training report.
   **Effort:** Low. **Expected benefit:** High. Improves convergence with little
   complexity and reduces dependence on one fixed learning rate.

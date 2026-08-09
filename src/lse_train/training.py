@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,14 @@ import cv2
 import numpy as np
 
 from .model import ARCHITECTURE, Initialization, build_detector, select_device
+
+DEFAULT_LEARNING_RATE = 1e-4
+DEFAULT_SCHEDULER_FACTOR = 0.3
+DEFAULT_SCHEDULER_PATIENCE = 2
+DEFAULT_MIN_LEARNING_RATE = 1e-6
+ADAMW_BETAS = (0.9, 0.999)
+ADAMW_EPSILON = 1e-8
+ADAMW_WEIGHT_DECAY = 1e-2
 
 
 def _training_imports() -> tuple[Any, Any]:
@@ -38,6 +47,89 @@ def _validation_loss(torch: Any, model: Any, loader: Any, device: Any) -> float:
             total += float(sum(model(images, targets).values()).detach().cpu())
             batches += 1
     return total / batches if batches else float("inf")
+
+
+def _optimizer_learning_rate(optimizer: Any) -> float:
+    rates = {float(group["lr"]) for group in optimizer.param_groups}
+    if len(rates) != 1:
+        raise RuntimeError("Training requires one shared learning rate across optimizer groups")
+    return rates.pop()
+
+
+def _finite_metric(value: float, *, name: str, epoch: int) -> float:
+    if not math.isfinite(value):
+        raise RuntimeError(f"{name} is not finite at epoch {epoch}: {value}")
+    return value
+
+
+def _step_learning_rate(
+    scheduler: Any | None,
+    optimizer: Any,
+    *,
+    epoch: int,
+    validation_loss: float,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    learning_rate = _optimizer_learning_rate(optimizer)
+    if scheduler is not None:
+        scheduler.step(validation_loss)
+    next_learning_rate = _optimizer_learning_rate(optimizer)
+    reduced = next_learning_rate < learning_rate
+    history = {
+        "epoch": epoch,
+        "learning_rate": learning_rate,
+        "validation_loss": validation_loss,
+        "next_learning_rate": next_learning_rate,
+        "reduced": reduced,
+    }
+    reduction = None
+    if reduced:
+        reduction = {
+            "epoch": epoch,
+            "reason": "validation_loss_plateau",
+            "monitored_value": validation_loss,
+            "previous_learning_rate": learning_rate,
+            "new_learning_rate": next_learning_rate,
+        }
+    return history, reduction
+
+
+def _optimizer_configuration(learning_rate: float) -> dict[str, Any]:
+    return {
+        "type": "AdamW",
+        "learning_rate": learning_rate,
+        "betas": list(ADAMW_BETAS),
+        "epsilon": ADAMW_EPSILON,
+        "weight_decay": ADAMW_WEIGHT_DECAY,
+        "amsgrad": False,
+        "foreach": None,
+        "maximize": False,
+        "capturable": False,
+        "differentiable": False,
+        "fused": None,
+    }
+
+
+def _scheduler_configuration(
+    *,
+    enabled: bool,
+    factor: float,
+    patience: int,
+    threshold: float,
+    minimum_learning_rate: float,
+) -> dict[str, Any]:
+    return {
+        "enabled": enabled,
+        "type": "ReduceLROnPlateau" if enabled else None,
+        "monitor": "validation_loss" if enabled else None,
+        "mode": "min" if enabled else None,
+        "factor": factor if enabled else None,
+        "patience": patience if enabled else None,
+        "threshold": threshold if enabled else None,
+        "threshold_mode": "abs" if enabled else None,
+        "cooldown": 0 if enabled else None,
+        "minimum_learning_rate": minimum_learning_rate if enabled else None,
+        "epsilon": ADAMW_EPSILON if enabled else None,
+    }
 
 
 class CocoDetectionDataset:
@@ -103,6 +195,11 @@ def train(
     min_delta: float = 0.0,
     augment: bool = True,
     initialization: Initialization = "coco-detector",
+    learning_rate: float = DEFAULT_LEARNING_RATE,
+    scheduler_enabled: bool = True,
+    scheduler_factor: float = DEFAULT_SCHEDULER_FACTOR,
+    scheduler_patience: int = DEFAULT_SCHEDULER_PATIENCE,
+    min_learning_rate: float = DEFAULT_MIN_LEARNING_RATE,
 ) -> dict[str, Any]:
     if epochs <= 0:
         raise ValueError("epochs must be positive")
@@ -110,6 +207,19 @@ def train(
         raise ValueError("patience cannot be negative")
     if min_delta < 0:
         raise ValueError("min_delta cannot be negative")
+    if learning_rate <= 0:
+        raise ValueError("learning_rate must be positive")
+    if scheduler_enabled:
+        if not 0 < scheduler_factor < 1:
+            raise ValueError("scheduler_factor must be between zero and one")
+        if scheduler_patience < 0:
+            raise ValueError("scheduler_patience cannot be negative")
+        if min_learning_rate < 0 or min_learning_rate >= learning_rate:
+            raise ValueError("min_learning_rate must be non-negative and below learning_rate")
+        if patience <= scheduler_patience + 1:
+            raise ValueError(
+                "Early-stopping patience must exceed scheduler patience by at least two epochs"
+            )
     manifest = json.loads((release / "manifest.json").read_text())
     if output.exists():
         raise ValueError(f"Refusing to overwrite training output: {output}")
@@ -130,9 +240,38 @@ def train(
     )
     device = select_device(torch)
     model.to(device).train()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=learning_rate,
+        betas=ADAMW_BETAS,
+        eps=ADAMW_EPSILON,
+        weight_decay=ADAMW_WEIGHT_DECAY,
+        amsgrad=False,
+        foreach=None,
+        maximize=False,
+        capturable=False,
+        differentiable=False,
+        fused=None,
+    )
+    scheduler = (
+        torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=scheduler_factor,
+            patience=scheduler_patience,
+            threshold=min_delta,
+            threshold_mode="abs",
+            cooldown=0,
+            min_lr=min_learning_rate,
+            eps=ADAMW_EPSILON,
+        )
+        if scheduler_enabled
+        else None
+    )
     losses: list[float] = []
     validation_losses: list[float] = []
+    learning_rate_history: list[dict[str, Any]] = []
+    learning_rate_reductions: list[dict[str, Any]] = []
     best_validation_loss = float("inf")
     best_epoch = 0
     stale_epochs = 0
@@ -143,13 +282,30 @@ def train(
             images = [image.to(device) for image in images]
             targets = [{key: value.to(device) for key, value in target.items()} for target in targets]
             loss = sum(model(images, targets).values())
+            loss_value = _finite_metric(
+                float(loss.detach().cpu()), name="training_loss", epoch=epoch
+            )
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            epoch_loss += float(loss.detach().cpu())
-        losses.append(epoch_loss / len(loader))
-        validation_loss = _validation_loss(torch, model, validation_loader, device)
+            epoch_loss += loss_value
+        training_loss = epoch_loss / len(loader)
+        losses.append(training_loss)
+        validation_loss = _finite_metric(
+            _validation_loss(torch, model, validation_loader, device),
+            name="validation_loss",
+            epoch=epoch,
+        )
         validation_losses.append(validation_loss)
+        history, reduction = _step_learning_rate(
+            scheduler,
+            optimizer,
+            epoch=epoch,
+            validation_loss=validation_loss,
+        )
+        learning_rate_history.append(history)
+        if reduction is not None:
+            learning_rate_reductions.append(reduction)
         if validation_loss < best_validation_loss - min_delta:
             best_validation_loss = validation_loss
             best_epoch = epoch
@@ -163,7 +319,7 @@ def train(
     checkpoint = output / "checkpoint.pt"
     torch.save(best_state or model.state_dict(), checkpoint)
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "dataset_release": manifest["release_id"],
         "dataset_composition": next(
             (
@@ -193,6 +349,17 @@ def train(
             "contrast_range": [0.85, 1.15],
             "brightness_delta": [-0.08, 0.08],
         },
+        "optimizer": _optimizer_configuration(learning_rate),
+        "scheduler": _scheduler_configuration(
+            enabled=scheduler_enabled,
+            factor=scheduler_factor,
+            patience=scheduler_patience,
+            threshold=min_delta,
+            minimum_learning_rate=min_learning_rate,
+        ),
+        "learning_rate_history": learning_rate_history,
+        "learning_rate_reductions": learning_rate_reductions,
+        "final_learning_rate": _optimizer_learning_rate(optimizer),
         "early_stopping": {
             "patience": patience,
             "min_delta": min_delta,

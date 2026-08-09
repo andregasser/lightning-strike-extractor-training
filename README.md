@@ -164,6 +164,14 @@ The training report references the checksummed dataset-composition and split
 audit JSON files from the release so experiment results retain their data and
 split-integrity provenance.
 
+Training uses a validation-loss-driven `ReduceLROnPlateau` scheduler by default:
+initial learning rate `1e-4`, reduction factor `0.3`, patience two and minimum
+rate `1e-6`. `training.json` records the complete AdamW and scheduler
+configuration, per-epoch learning-rate history, reduction events and final
+rate. Use `--no-scheduler` for a controlled fixed-rate comparison. When the
+scheduler is enabled, early-stopping patience must exceed scheduler patience by
+at least two epochs so a reduced rate can affect a later epoch.
+
 Use `--initialization imagenet-backbone` or `--initialization random` for a
 controlled transfer-learning comparison. The first COCO-pretrained run may
 download official versioned Torchvision weights; later runs use the PyTorch

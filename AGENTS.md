@@ -95,9 +95,14 @@ instead of silently contradicting it in code or documentation.
 
 - Add focused tests for every behavior change, validation rule and edge case.
 - Test both successful publication and failure before publication.
-- Review the complete affected path after substantial changes, including API
-  consistency, security, resource usage, reproducibility, documentation and
-  unintended changes.
+- After every substantial change, perform a comprehensive code review before
+  committing or handing off the work. Review the complete affected execution
+  path rather than only the edited lines, and check architecture and API
+  consistency, correctness, failure and interruption behavior, security and
+  resource usage, backward compatibility, test coverage, documentation,
+  reproducibility and unintended changes elsewhere in the worktree. Resolve
+  all actionable findings and rerun the relevant checks after review-driven
+  edits.
 - Keep README examples runnable against the current code.
 - Do not present an unimplemented annotation converter, training path or model
   promotion step as finished functionality.

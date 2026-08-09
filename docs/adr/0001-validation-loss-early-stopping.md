@@ -19,7 +19,9 @@ loss. The test split remains reserved for final evaluation and release review.
 
 The CLI exposes `--patience` (default `5`) and `--min-delta` (default `0.0`).
 Training reports requested and completed epochs, validation-loss history and
-the selected best epoch.
+the selected best epoch. ADR 0007 supplements this decision with
+validation-loss learning-rate scheduling and defines the minimum spacing
+between scheduler and early-stopping patience.
 
 ## Consequences
 
