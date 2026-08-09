@@ -48,6 +48,29 @@ different commands here:
   uv run lse inspect /data/storms/camera-a.mp4 > /data/metadata/camera-a.json
   ```
 
+  Beispiel der Ausgabe für ein einzelnes Video:
+
+  ```json
+  {
+    "path": "/data/storms/camera-a.mp4",
+    "name": "camera-a.mp4",
+    "duration_seconds": 842.37,
+    "size_bytes": 1843920187,
+    "bit_rate": 17490000,
+    "format": "mov,mp4,m4a,3gp,3g2,mj2",
+    "video": {
+      "codec_type": "video",
+      "codec_name": "hevc",
+      "width": 3840,
+      "height": 2160,
+      "avg_frame_rate": "60000/1001",
+      "fps": 59.94005994005994,
+      "pix_fmt": "yuv420p"
+    },
+    "has_audio": true
+  }
+  ```
+
   Use it to validate a file and discover safe time ranges before processing.
 - `analyze` performs the actual video analysis. It decodes frames, detects
   lightning candidates, ranks events and writes an isolated run with metadata,
