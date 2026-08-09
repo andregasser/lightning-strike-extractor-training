@@ -1,4 +1,8 @@
-# Lightning Strike Model Lab
+<p align="center">
+  <img src="docs/assets/lightning-extractor-training-hero.png" alt="Storm lightning with an overlaid detection and dataset pipeline" width="100%">
+</p>
+
+# Lightning Strike Extractor Training
 
 Independent dataset and detector development for the Lightning Strike Extractor.
 
@@ -152,7 +156,7 @@ opset, runtime compatibility, dataset provenance and artifact hash.
 
 Promotion is explicit. After reviewing evaluation and ONNX parity, copy the
 released artifact into the product repository and update its manifest. The
-product runtime then validates the checksum and tensor contract. The model lab
+product runtime then validates the checksum and tensor contract. The training repository
 never pushes a model directly into a production checkout, and the product never
 downloads research checkpoints implicitly.
 
@@ -168,7 +172,7 @@ src/lightning_model_lab/
 ├── onnx_release.py     # export and parity checks
 └── cli.py              # lightning-model entry point
 tools/                  # annotation-format adapters and local utilities
-tests/                  # deterministic model-lab tests
+tests/                  # deterministic training tests
 ```
 
 ## Development checks

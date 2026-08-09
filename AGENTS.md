@@ -8,12 +8,12 @@ the Lightning Strike Extractor. It is independent from the video-analysis CLI.
 
 ## Architecture
 
-- Production model-lab code lives in `src/lightning_model_lab/`.
+- Production training code lives in `src/lightning_model_lab/`.
 - The CLI entry point is `lightning_model_lab.cli:main` and is exposed as
   `lightning-model` through `pyproject.toml`.
 - Annotation-format adapters and local utilities live in `tools/`.
 - Tests live in `tests/` and use `pytest`.
-- The model lab must never import `lightning_extractor` or require the product
+- The training repository must never import `lightning_extractor` or require the product
   repository to be installed.
 - The only product-facing output is a released ONNX bundle with manifest and
   checksums. Training checkpoints and annotation work products stay here.
@@ -59,7 +59,7 @@ uv run lightning-model release /path/to/verified-dataset \
 - Prefer deterministic processing and stable ordering.
 - Preserve source and frame provenance through every transformation.
 - Do not silently resolve conflicting annotations or source assignments.
-- Keep training framework details behind model-lab APIs; the ONNX manifest is
+- Keep training framework details behind training APIs; the ONNX manifest is
   the product contract.
 - Treat evaluation metrics and ONNX parity as release gates, not optional logs.
 

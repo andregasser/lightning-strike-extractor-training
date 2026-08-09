@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "lightning-model-lab"
 version = "0.1.0"
-description = "Independent dataset, training, evaluation, and ONNX release pipeline"
+description = "Independent Lightning Strike Extractor dataset, training, evaluation, and ONNX release pipeline"
 requires-python = ">=3.11"
 dependencies = [
   "numpy>=2,<3",
