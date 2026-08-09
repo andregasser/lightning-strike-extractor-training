@@ -172,6 +172,15 @@ rate. Use `--no-scheduler` for a controlled fixed-rate comparison. When the
 scheduler is enabled, early-stopping patience must exceed scheduler patience by
 at least two epochs so a reduced rate can affect a later epoch.
 
+The schema-version-three training report also records performance evidence for
+each epoch and the complete run: elapsed training and validation time,
+DataLoader wait, device transfer, optimization, image and batch throughput,
+process peak resident memory and backend-specific device memory. CUDA uses
+resettable PyTorch peak counters. MPS memory is sampled at synchronized phase
+boundaries because PyTorch does not expose an equivalent peak counter. Reliable
+device-utilization percentages are reported as unavailable rather than
+estimated without a trustworthy backend API.
+
 Use `--initialization imagenet-backbone` or `--initialization random` for a
 controlled transfer-learning comparison. The first COCO-pretrained run may
 download official versioned Torchvision weights; later runs use the PyTorch

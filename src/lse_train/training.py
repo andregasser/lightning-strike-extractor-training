@@ -4,12 +4,14 @@ import json
 import math
 import random
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import cv2
 import numpy as np
 
 from .model import ARCHITECTURE, Initialization, build_detector, select_device
+from .performance import DeviceProfiler, build_performance_report, process_peak_memory_report
 
 DEFAULT_LEARNING_RATE = 1e-4
 DEFAULT_SCHEDULER_FACTOR = 0.3
@@ -272,15 +274,51 @@ def train(
     validation_losses: list[float] = []
     learning_rate_history: list[dict[str, Any]] = []
     learning_rate_reductions: list[dict[str, Any]] = []
+    performance_epochs: list[dict[str, Any]] = []
+    total_training_seconds = 0.0
+    total_validation_seconds = 0.0
+    total_data_loading_seconds = 0.0
+    total_device_transfer_seconds = 0.0
+    total_optimization_seconds = 0.0
+    training_images = 0
+    training_batches = 0
+    validation_images = 0
+    validation_batches = 0
     best_validation_loss = float("inf")
     best_epoch = 0
     stale_epochs = 0
     best_state: dict[str, Any] | None = None
+    device_profiler = DeviceProfiler(torch, device)
+    device_profiler.start()
+    run_started = perf_counter()
     for epoch in range(1, epochs + 1):
+        epoch_started = perf_counter()
+        epoch_data_loading_seconds = 0.0
+        epoch_device_transfer_seconds = 0.0
+        epoch_optimization_seconds = 0.0
+        epoch_training_images = 0
+        epoch_training_batches = 0
         epoch_loss = 0.0
-        for images, targets in loader:
+        data_loading_started = perf_counter()
+        iterator = iter(loader)
+        while True:
+            try:
+                images, targets = next(iterator)
+            except StopIteration:
+                break
+            data_loading_seconds = perf_counter() - data_loading_started
+            epoch_data_loading_seconds += data_loading_seconds
+            total_data_loading_seconds += data_loading_seconds
+
+            transfer_started = perf_counter()
             images = [image.to(device) for image in images]
             targets = [{key: value.to(device) for key, value in target.items()} for target in targets]
+            device_profiler.synchronize()
+            transfer_seconds = perf_counter() - transfer_started
+            epoch_device_transfer_seconds += transfer_seconds
+            total_device_transfer_seconds += transfer_seconds
+
+            optimization_started = perf_counter()
             loss = sum(model(images, targets).values())
             loss_value = _finite_metric(
                 float(loss.detach().cpu()), name="training_loss", epoch=epoch
@@ -288,14 +326,39 @@ def train(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            device_profiler.synchronize()
+            optimization_seconds = perf_counter() - optimization_started
+            epoch_optimization_seconds += optimization_seconds
+            total_optimization_seconds += optimization_seconds
+            device_profiler.sample_memory()
+
+            batch_images = len(images)
+            epoch_training_images += batch_images
+            training_images += batch_images
+            epoch_training_batches += 1
+            training_batches += 1
             epoch_loss += loss_value
+            data_loading_started = perf_counter()
+        epoch_training_seconds = perf_counter() - epoch_started
+        total_training_seconds += epoch_training_seconds
         training_loss = epoch_loss / len(loader)
         losses.append(training_loss)
+
+        device_profiler.synchronize()
+        validation_started = perf_counter()
         validation_loss = _finite_metric(
             _validation_loss(torch, model, validation_loader, device),
             name="validation_loss",
             epoch=epoch,
         )
+        device_profiler.synchronize()
+        epoch_validation_seconds = perf_counter() - validation_started
+        total_validation_seconds += epoch_validation_seconds
+        device_profiler.sample_memory()
+        epoch_validation_images = len(validation_dataset)
+        epoch_validation_batches = len(validation_loader)
+        validation_images += epoch_validation_images
+        validation_batches += epoch_validation_batches
         validation_losses.append(validation_loss)
         history, reduction = _step_learning_rate(
             scheduler,
@@ -306,6 +369,7 @@ def train(
         learning_rate_history.append(history)
         if reduction is not None:
             learning_rate_reductions.append(reduction)
+        should_stop = False
         if validation_loss < best_validation_loss - min_delta:
             best_validation_loss = validation_loss
             best_epoch = epoch
@@ -314,12 +378,38 @@ def train(
         else:
             stale_epochs += 1
             if stale_epochs >= patience:
-                break
+                should_stop = True
+        epoch_total_seconds = perf_counter() - epoch_started
+        performance_epochs.append(
+            {
+                "epoch": epoch,
+                "total_seconds": epoch_total_seconds,
+                "training_seconds": epoch_training_seconds,
+                "validation_seconds": epoch_validation_seconds,
+                "data_loading_seconds": epoch_data_loading_seconds,
+                "device_transfer_seconds": epoch_device_transfer_seconds,
+                "optimization_seconds": epoch_optimization_seconds,
+                "training_images": epoch_training_images,
+                "training_batches": epoch_training_batches,
+                "validation_images": epoch_validation_images,
+                "validation_batches": epoch_validation_batches,
+                "training_images_per_second": (
+                    epoch_training_images / epoch_training_seconds
+                    if epoch_training_seconds
+                    else None
+                ),
+            }
+        )
+        if should_stop:
+            break
     output.mkdir(parents=True)
     checkpoint = output / "checkpoint.pt"
     torch.save(best_state or model.state_dict(), checkpoint)
+    device_profiler.synchronize()
+    device_profiler.sample_memory()
+    total_seconds = perf_counter() - run_started
     report = {
-        "schema_version": 2,
+        "schema_version": 3,
         "dataset_release": manifest["release_id"],
         "dataset_composition": next(
             (
@@ -360,6 +450,21 @@ def train(
         "learning_rate_history": learning_rate_history,
         "learning_rate_reductions": learning_rate_reductions,
         "final_learning_rate": _optimizer_learning_rate(optimizer),
+        "performance": build_performance_report(
+            total_seconds=total_seconds,
+            training_seconds=total_training_seconds,
+            validation_seconds=total_validation_seconds,
+            data_loading_seconds=total_data_loading_seconds,
+            device_transfer_seconds=total_device_transfer_seconds,
+            optimization_seconds=total_optimization_seconds,
+            training_images=training_images,
+            training_batches=training_batches,
+            validation_images=validation_images,
+            validation_batches=validation_batches,
+            epochs=performance_epochs,
+            process_memory=process_peak_memory_report(),
+            device=device_profiler.report(),
+        ),
         "early_stopping": {
             "patience": patience,
             "min_delta": min_delta,

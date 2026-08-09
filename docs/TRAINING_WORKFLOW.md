@@ -489,6 +489,26 @@ reduction events, final learning rate, training losses, validation losses and
 early-stopping metadata. Treat the checkpoint and report as one experiment; do
 not rename or detach them from their dataset release.
 
+The `performance` section provides measurements for optimization decisions:
+
+- total, training and validation wall-clock duration;
+- time waiting for DataLoader batches, transferring tensors to the selected
+  device and running forward/backward/optimizer work;
+- training images and batches per second, plus per-epoch phase timings;
+- process-lifetime peak resident memory;
+- exact resettable CUDA peak allocated and reserved memory when CUDA is used;
+- MPS allocated and driver memory sampled at synchronized phase boundaries when
+  those PyTorch APIs are available;
+- an explicit availability status and reason for every unsupported measurement.
+
+CUDA and MPS operations are synchronized before timing boundaries so reported
+durations include device execution instead of only asynchronous dispatch. The
+process RSS counter cannot be reset and therefore represents the Python
+process-lifetime peak, not only allocations made inside the epoch loop. PyTorch
+does not expose a consistent dependency-free utilization percentage for CPU,
+CUDA and MPS, so `device.utilization.average_percent` remains `null` with a
+reason. Do not interpret that value as zero utilization.
+
 Run controlled initialization comparisons with otherwise identical settings:
 
 ```bash

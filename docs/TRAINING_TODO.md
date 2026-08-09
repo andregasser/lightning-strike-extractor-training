@@ -85,7 +85,7 @@ verified dataset and baseline results exist.
   measured bottlenecks.
   **Effort:** Medium. **Expected benefit:** Medium. Improves throughput when data
   loading or device transfer is the measured bottleneck.
-- [ ] Record throughput, data-loading time, device utilization and peak memory.
+- [x] Record throughput, data-loading time, device utilization and peak memory.
   **Effort:** Low to medium. **Expected benefit:** Medium. Provides the evidence
   needed to prioritize performance work instead of guessing.
 
