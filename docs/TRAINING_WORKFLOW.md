@@ -301,6 +301,67 @@ campaigns/lightning-2026-08-09-camera-a/
 └── serve/images/
 ```
 
+The campaign paths have deliberately separate responsibilities:
+
+| Path | Purpose | Lifecycle |
+| --- | --- | --- |
+| `manifest.json` | Campaign metadata, source handoff reference, task count, source distribution, image dimensions and checksums. | Immutable campaign record; keep it with the campaign. |
+| `annotation/tasks.json` | Label Studio task definitions. Each task points to an image URL and carries source/frame provenance. | Input to Label Studio; do not edit manually. |
+| `annotation/label-config.xml` | Label Studio labeling interface for the `lightning_channel` rectangle class. | Versioned configuration for the campaign. |
+| `serve/images/` | Validated copies of the handoff images served to Label Studio over HTTP. | Disposable/recreatable serving area; never treat it as the raw source. |
+
+The image copies under `serve/images/` are intentionally separate from
+`annotation/`. Label Studio reads pixels from the HTTP server, while the task
+file stores URLs and provenance. The campaign manifest remains the integrity
+record. If the serving directory is lost, recreate the campaign from the
+original handoff rather than copying files back from an annotation export.
+
+### Label Studio preparation
+
+The campaign output is prepared specifically for Label Studio. The importer
+does not upload anything to a hosted annotation service and does not require
+the `lse` package. It creates a self-contained task package that can be served
+locally or copied to the annotation workstation:
+
+- `serve/images/` contains the validated image copies that Label Studio must
+  load. The original handoff remains unchanged.
+- `annotation/tasks.json` contains one task per image. Each task includes the
+  image URL, stable `source_id`, original file name and complete frame
+  provenance. The URLs use the `--image-base-url` value passed to
+  `import-handoff` (by default `http://localhost:8001/images`).
+- `annotation/label-config.xml` defines the single rectangle class
+  `lightning_channel` and instructs the annotator to draw a tight box around
+  every visible channel.
+- `manifest.json` records the campaign inputs, checksums, dimensions, task
+  count and source distribution.
+
+Serve the prepared images from the campaign directory before importing the
+tasks into Label Studio. For example, from the campaign root:
+
+```bash
+cd campaigns/lightning-2026-08-09-camera-a
+python3 -m http.server 8001 --directory serve
+```
+
+In Label Studio, create a project with the contents of
+`annotation/label-config.xml` as its labeling interface, then import
+`annotation/tasks.json` as the task file. The project must be able to resolve
+the image URLs from the running server. If the server uses another host or
+port, pass the matching URL when creating the campaign:
+
+```bash
+uv run lse-train import-handoff \
+  /data/handoffs/lightning-2026-08-09-camera-a \
+  --output campaigns/lightning-2026-08-09-camera-a \
+  --image-base-url http://annotation-host:8001/images
+```
+
+Label every task, including negative images. Export the completed annotations
+from Label Studio and convert or normalize them into the verified COCO-style
+campaign layout described in the next section. Keep the exported annotation
+file together with the campaign manifest and preserve the source IDs and frame
+provenance; do not train directly from the raw Label Studio export.
+
 The current campaign format is designed for rectangle annotation of the single
 class `lightning_channel`. Annotate every image, including negatives. Draw a
 tight box around each visible channel; do not label a bright flash without a
