@@ -15,7 +15,7 @@ details never enter the product distribution.
 ## Boundary and data flow
 
 ```text
-lightning-strike-extractor             lightning-strike-model-lab
+lightning-strike-extractor             lightning-strike-extractor-training
 ────────────────────────────           ───────────────────────────
 raw video                              frame handoff
     │                                  │
@@ -38,8 +38,8 @@ Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), and a suitable
 PyTorch installation for the selected training hardware.
 
 ```bash
-git clone git@github.com:andregasser/lightning-strike-model-lab.git
-cd lightning-strike-model-lab
+git clone git@github.com:andregasser/lightning-strike-extractor-training.git
+cd lightning-strike-extractor-training
 uv sync --extra train --extra dev
 ```
 
