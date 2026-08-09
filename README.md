@@ -121,8 +121,12 @@ changes; never edit an existing release in place.
 
 ## Train and evaluate
 
-The current implementation provides a reproducible Faster R-CNN/MobileNet
-baseline. It is a reference point, not a final architecture decision.
+The current implementation uses Faster R-CNN with a ResNet-50 FPN V2 backbone.
+COCO detector pretraining is the default; the COCO classification predictor is
+replaced with the project-specific background-plus-`lightning_channel` head.
+ImageNet-backbone and random initialization remain explicit comparison modes.
+See `docs/adr/0004-resnet50-fpn-v2-detector.md` and the prioritized
+`docs/TRAINING_TODO.md` roadmap.
 
 ```bash
 uv run lse-train train releases/lightning-2026.08.1 \
@@ -138,6 +142,11 @@ and recall at a documented IoU and confidence threshold. Training evaluates
 validation loss after every epoch, stops after `--patience` non-improving
 epochs, and saves the best validation checkpoint. Compare multiple
 architectures on the same release before production promotion.
+
+Use `--initialization imagenet-backbone` or `--initialization random` for a
+controlled transfer-learning comparison. The first COCO-pretrained run may
+download official versioned Torchvision weights; later runs use the PyTorch
+cache. Training prefers CUDA, then Apple Metal through MPS, and otherwise CPU.
 
 ## Export and verify ONNX
 
@@ -176,6 +185,7 @@ src/lse_train/
 ├── handoff.py          # frame handoff validation and campaigns
 ├── coco.py             # verified dataset validation
 ├── release.py          # immutable dataset releases
+├── model.py            # detector architecture, initialization and device selection
 ├── training.py         # baseline training
 ├── evaluation.py       # candidate evaluation
 ├── onnx_release.py     # export and parity checks

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .evaluation import evaluate
 from .handoff import import_handoff
+from .model import INITIALIZATIONS
 from .onnx_release import export_onnx_release
 from .release import build_release
 from .training import train
@@ -29,6 +30,12 @@ def main(argv: list[str] | None = None) -> int:
     training.add_argument("--seed", type=int, default=17)
     training.add_argument("--patience", type=int, default=5)
     training.add_argument("--min-delta", type=float, default=0.0)
+    training.add_argument(
+        "--initialization",
+        choices=INITIALIZATIONS,
+        default="coco-detector",
+        help="Initialize from COCO detector weights, ImageNet backbone weights, or randomly",
+    )
     training.add_argument(
         "--no-augmentation",
         action="store_true",
@@ -63,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
             patience=args.patience,
             min_delta=args.min_delta,
             augment=not args.no_augmentation,
+            initialization=args.initialization,
         )
     elif args.command == "evaluate":
         result = evaluate(args.release, args.checkpoint, args.output, split=args.split)

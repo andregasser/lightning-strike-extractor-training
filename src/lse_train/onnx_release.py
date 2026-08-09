@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 
+from .model import ARCHITECTURE, build_detector
 from .training import _training_imports
 
 
@@ -45,9 +46,9 @@ def export_onnx_release(
     except ImportError as error:
         raise RuntimeError("ONNX dependencies are missing; run `uv sync --extra train`") from error
 
-    base = torchvision.models.detection.fasterrcnn_mobilenet_v3_large_320_fpn(
-        weights=None, weights_backbone=None, num_classes=2
-    )
+    if training.get("architecture") != ARCHITECTURE:
+        raise ValueError(f"Training report architecture must be {ARCHITECTURE}")
+    base, _ = build_detector(torchvision, initialization="random")
     base.load_state_dict(torch.load(checkpoint, map_location="cpu", weights_only=True))
     base.eval()
 
@@ -65,8 +66,11 @@ def export_onnx_release(
         staged = Path(temporary) / output.name
         staged.mkdir()
         artifact = staged / "model.onnx"
-        sample = torch.zeros((1, 3, input_size, input_size), dtype=torch.float32)
-        wrapper = ExportWrapper(base)
+        generator = torch.Generator().manual_seed(0)
+        sample = torch.rand(
+            (1, 3, input_size, input_size), dtype=torch.float32, generator=generator
+        )
+        wrapper = ExportWrapper(base).eval()
         with torch.no_grad():
             reference = wrapper(sample)
         torch.onnx.export(
@@ -77,15 +81,24 @@ def export_onnx_release(
             output_names=["boxes", "scores", "class_ids"],
             dynamic_axes={"boxes": {0: "detections"}, "scores": {0: "detections"}, "class_ids": {0: "detections"}},
             opset_version=opset,
+            dynamo=False,
         )
         onnx.checker.check_model(onnx.load(artifact))
         session = onnxruntime.InferenceSession(str(artifact), providers=["CPUExecutionProvider"])
         actual = session.run(None, {"images": sample.numpy()})
         if len(actual) != 3:
             raise RuntimeError("Exported ONNX model does not expose the detector contract")
-        for expected, observed in zip(reference, actual):
-            if expected.shape != observed.shape or not np.allclose(expected.numpy(), observed, rtol=1e-3, atol=1e-4):
-                raise RuntimeError("ONNX parity check failed")
+        for name, expected, observed in zip(("boxes", "scores", "class_ids"), reference, actual):
+            if expected.shape != observed.shape:
+                raise RuntimeError(
+                    f"ONNX parity check failed for {name}: "
+                    f"expected shape {tuple(expected.shape)}, observed {observed.shape}"
+                )
+            if not np.allclose(expected.numpy(), observed, rtol=1e-3, atol=1e-4):
+                difference = float(np.max(np.abs(expected.numpy() - observed)))
+                raise RuntimeError(
+                    f"ONNX parity check failed for {name}: maximum absolute difference {difference}"
+                )
         manifest = {
             "schema_version": 1,
             "name": "lightning-channel-detector",
@@ -103,6 +116,8 @@ def export_onnx_release(
             "onnx_opset": opset,
             "minimum_onnxruntime_version": "1.20",
             "dataset_release": training["dataset_release"],
+            "architecture": training["architecture"],
+            "initialization": training.get("initialization"),
             "evaluation": evaluation,
         }
         (staged / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")

@@ -406,14 +406,15 @@ new release ID; never edit a published release in place.
 
 ## 6. Train the first baseline
 
-The current baseline is Faster R-CNN with a MobileNet backbone. It is a
-reference point for reproducible comparisons, not a claim that it is the final
-architecture.
+The detector is Faster R-CNN with a ResNet-50 FPN V2 backbone. Training uses
+versioned COCO detector weights by default, then replaces the COCO classifier
+with a background-plus-`lightning_channel` predictor. ImageNet-backbone and
+random initialization remain available as controlled comparison modes.
 
 ```bash
 uv run lse-train train \
   releases/datasets/lightning-2026.08.1 \
-  --output experiments/2026-08-09-fasterrcnn-mobilenet \
+  --output experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2 \
   --epochs 10 \
   --seed 17 \
   --patience 5
@@ -422,7 +423,7 @@ uv run lse-train train \
 The command trains only on the `train` split and writes:
 
 ```text
-experiments/2026-08-09-fasterrcnn-mobilenet/
+experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/
 ├── checkpoint.pt
 └── training.json
 ```
@@ -434,10 +435,27 @@ checkpoint, not necessarily the final epoch. Set `--patience 0` only when you
 intentionally want to stop at the first non-improving epoch; use a larger value
 for noisy validation curves.
 
-`training.json` records the dataset release, architecture, requested and
-completed epochs, seed, training losses, validation losses and early-stopping
-metadata. Treat the checkpoint and report as one experiment; do not rename or
-detach them from their dataset release.
+`training.json` records the dataset release, architecture, exact initialization
+mode and weight identifiers, device, requested and completed epochs, seed,
+training losses, validation losses and early-stopping metadata. Treat the
+checkpoint and report as one experiment; do not rename or detach them from
+their dataset release.
+
+Run controlled initialization comparisons with otherwise identical settings:
+
+```bash
+uv run lse-train train releases/datasets/lightning-2026.08.1 \
+  --output experiments/imagenet-backbone \
+  --initialization imagenet-backbone
+
+uv run lse-train train releases/datasets/lightning-2026.08.1 \
+  --output experiments/random-control \
+  --initialization random
+```
+
+The default COCO mode may download official Torchvision weights on first use.
+Subsequent runs use the normal PyTorch cache. Training selects CUDA first,
+Apple Metal through MPS second, and CPU otherwise.
 
 Training augmentation is enabled by default. The current conservative pipeline
 randomly mirrors training images horizontally and applies small contrast and
@@ -465,9 +483,9 @@ unbiased report.
 ```bash
 uv run lse-train evaluate \
   releases/datasets/lightning-2026.08.1 \
-  experiments/2026-08-09-fasterrcnn-mobilenet/checkpoint.pt \
+  experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/checkpoint.pt \
   --split validation \
-  --output experiments/2026-08-09-fasterrcnn-mobilenet/validation.json
+  --output experiments/2026-08-09-fasterrcnn-resnet50-fpn-v2/validation.json
 ```
 
 The report includes true positives, false positives, false negatives,

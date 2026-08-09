@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .model import build_detector
 from .training import CocoDetectionDataset, _training_imports
 
 
@@ -30,9 +31,7 @@ def evaluate(
     dataset = CocoDetectionDataset(release, split)
     if not dataset:
         raise ValueError(f"{split} split is empty")
-    model = torchvision.models.detection.fasterrcnn_mobilenet_v3_large_320_fpn(
-        weights=None, weights_backbone=None, num_classes=2
-    )
+    model, _ = build_detector(torchvision, initialization="random")
     model.load_state_dict(torch.load(checkpoint, map_location="cpu", weights_only=True))
     model.eval()
     true_positives = false_positives = false_negatives = 0

@@ -8,6 +8,8 @@ from typing import Any
 import cv2
 import numpy as np
 
+from .model import ARCHITECTURE, Initialization, build_detector, select_device
+
 
 def _training_imports() -> tuple[Any, Any]:
     try:
@@ -78,7 +80,7 @@ class CocoDetectionDataset:
 
 def _augment_training_sample(torch: Any, tensor: Any, target: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
     """Apply conservative detection-safe augmentation to one training sample."""
-    _, height, width = tensor.shape
+    _, _, width = tensor.shape
     if float(torch.rand(1)) < 0.5:
         tensor = torch.flip(tensor, dims=(2,))
         boxes = target["boxes"].clone()
@@ -100,6 +102,7 @@ def train(
     patience: int = 5,
     min_delta: float = 0.0,
     augment: bool = True,
+    initialization: Initialization = "coco-detector",
 ) -> dict[str, Any]:
     if epochs <= 0:
         raise ValueError("epochs must be positive")
@@ -122,10 +125,10 @@ def train(
         raise ValueError("Validation split is empty; early stopping requires validation data")
     loader = _loader(torch, dataset, shuffle=True)
     validation_loader = _loader(torch, validation_dataset, shuffle=False)
-    model = torchvision.models.detection.fasterrcnn_mobilenet_v3_large_320_fpn(
-        weights=None, weights_backbone=None, num_classes=2
+    model, initialization_metadata = build_detector(
+        torchvision, initialization=initialization
     )
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = select_device(torch)
     model.to(device).train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     losses: list[float] = []
@@ -162,7 +165,9 @@ def train(
     report = {
         "schema_version": 1,
         "dataset_release": manifest["release_id"],
-        "architecture": "fasterrcnn_mobilenet_v3_large_320_fpn",
+        "architecture": ARCHITECTURE,
+        "initialization": initialization_metadata,
+        "device": str(device),
         "epochs": epochs,
         "epochs_completed": len(losses),
         "seed": seed,
